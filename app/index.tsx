@@ -6,26 +6,23 @@ import {
   SafeAreaView,
   ScrollView,
   TouchableOpacity,
-  TextInput,
   Alert,
   Animated,
   Dimensions,
-  KeyboardAvoidingView,
-  Platform,
-  Keyboard,
-  TouchableWithoutFeedback,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useExpense } from '@/contexts/ExpenseContext';
 import { useSettings } from '@/contexts/SettingsContext';
-import { ChevronDown, ChevronUp, CreditCard as Edit, Trash2, Calendar, Plus, Check, ChevronLeft, ChevronRight } from 'lucide-react-native';
+import { ChevronDown, ChevronUp, CreditCard as Edit, Trash2, Calendar, Plus, ChevronLeft, ChevronRight } from 'lucide-react-native';
 import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isToday, addDays, subDays, addWeeks, subWeeks, addMonths, subMonths, isSameDay, setHours, setMinutes, setSeconds, setMilliseconds, isAfter, isBefore } from 'date-fns';
 import Sidebar from '@/components/Sidebar';
 import HeaderBrand from '@/components/HeaderBrand';
+import ExpenseModal from '@/components/ExpenseModal';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { CurrencyFormatter } from '@/utils/formatCurrency';
+import { Platform } from 'react-native';
 
 type ViewMode = 'daily' | 'weekly' | 'monthly';
 
@@ -41,17 +38,18 @@ export default function HomeScreen() {
   const [viewMode, setViewMode] = useState<ViewMode>('daily');
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [showDetails, setShowDetails] = useState(false);
-  const [expenseAmount, setExpenseAmount] = useState('');
-  const [expenseDescription, setExpenseDescription] = useState('');
-  const [editingExpense, setEditingExpense] = useState<string | null>(null);
   const [showSidebar, setShowSidebar] = useState(false);
-  const [keyboardHeight, setKeyboardHeight] = useState(0);
-  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
-  const [activeField, setActiveField] = useState<'amount' | 'description' | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
+  
+  // Modal state
+  const [showExpenseModal, setShowExpenseModal] = useState(false);
+  const [editingExpense, setEditingExpense] = useState<{
+    id: string;
+    amount: number;
+    description: string;
+  } | null>(null);
 
   const scrollY = useRef(new Animated.Value(0)).current;
-  const inputFormTranslateY = useRef(new Animated.Value(0)).current;
   
   // Main amount display animation values
   const mainAmountTranslateY = useRef(new Animated.Value(0)).current;
@@ -71,10 +69,6 @@ export default function HomeScreen() {
   const toggleButtonTranslateY = useRef(new Animated.Value(0)).current;
   const toggleButtonOpacity = useRef(new Animated.Value(1)).current;
   const toggleButtonScale = useRef(new Animated.Value(1)).current;
-
-  // Refs for input fields
-  const amountInputRef = useRef<TextInput>(null);
-  const descriptionInputRef = useRef<TextInput>(null);
 
   // IMPROVED: Enhanced setup check with better debugging
   useEffect(() => {
@@ -244,69 +238,6 @@ export default function HomeScreen() {
     }
   }, [showDetails]);
 
-  // Keyboard event listeners
-  useEffect(() => {
-    const keyboardWillShow = (event: any) => {
-      const keyboardHeight = 260;
-      console.log(keyboardHeight)
-      setKeyboardHeight(keyboardHeight);
-      setIsKeyboardVisible(true);
-    };
-
-    const keyboardWillHide = (event: any) => {
-      setKeyboardHeight(0);
-      setIsKeyboardVisible(false);
-      setActiveField(null);
-      
-      // Return form to its original bottom position
-      Animated.timing(inputFormTranslateY, {
-        toValue: 100,
-        duration: event.duration || 250,
-        useNativeDriver: true,
-      }).start();
-    };
-
-    let showSubscription: any;
-    let hideSubscription: any;
-
-    if (Platform.OS === 'ios') {
-      showSubscription = Keyboard.addListener('keyboardWillShow', keyboardWillShow);
-      hideSubscription = Keyboard.addListener('keyboardWillHide', keyboardWillHide);
-    } else {
-      showSubscription = Keyboard.addListener('keyboardDidShow', keyboardWillShow);
-      hideSubscription = Keyboard.addListener('keyboardDidHide', keyboardWillHide);
-    }
-    
-    return () => {
-      showSubscription?.remove();
-      hideSubscription?.remove();
-    };
-  }, []);
-
-  // FIXED: Handle positioning when activeField or keyboard visibility changes
-  useEffect(() => {
-    if (isKeyboardVisible && keyboardHeight > 0 && activeField) {
-      // Calculate position based on which field is active
-      const safeAreaBottom = insets.bottom;
-      let adjustedHeight;
-      
-      // FIXED: Use the same calculation for both fields to ensure consistent positioning
-      if (activeField === 'description') {
-        // For description field, use the same base calculation as amount field
-        adjustedHeight = keyboardHeight - safeAreaBottom + 120 - 300;
-      } else {
-        // For amount field, standard positioning
-        adjustedHeight = keyboardHeight - safeAreaBottom + 20 - 300;
-      }
-      
-      Animated.timing(inputFormTranslateY, {
-        toValue: -adjustedHeight,
-        duration: 250,
-        useNativeDriver: true,
-      }).start();
-    }
-  }, [activeField, isKeyboardVisible, keyboardHeight, insets.bottom]);
-
   // IMPROVED: Enhanced currency formatting with English suffixes
   const formatCurrency = (amount: number): string => {
     const symbol = userSettings?.currencySymbol || '$';
@@ -441,59 +372,31 @@ export default function HomeScreen() {
     return expenseDate.toISOString();
   };
 
-  const handleAddExpense = async () => {
-    if (!expenseAmount || !expenseDescription) {
-      Alert.alert('Error', 'Please fill in both amount and description');
-      return;
-    }
-
-    const amount = parseFloat(expenseAmount);
-    if (isNaN(amount) || amount <= 0) {
-      Alert.alert('Error', 'Please enter a valid amount');
-      return;
-    }
-
-    try {
-      if (editingExpense) {
-        await updateExpense(editingExpense, amount, expenseDescription);
-        setEditingExpense(null);
-      } else {
-        // FIXED: Use the selected date for new expenses
-        await addExpense(amount, expenseDescription, createExpenseDate());
-      }
-      setExpenseAmount('');
-      setExpenseDescription('');
-      setActiveField(null);
-      
-      // Dismiss keyboard after adding expense
-      Keyboard.dismiss();
-    } catch (error) {
-      Alert.alert('Error', 'Failed to save expense');
-    }
+  // Modal handlers
+  const handleAddExpense = () => {
+    setEditingExpense(null);
+    setShowExpenseModal(true);
   };
 
   const handleEditExpense = (expense: any) => {
-    setExpenseAmount(expense.amount.toString());
-    setExpenseDescription(expense.description);
-    setEditingExpense(expense.id);
-    
-    // For weekly and monthly views, show details first
-    if (viewMode !== 'daily') {
-      setShowDetails(true);
-    }
-    
-    // Auto-focus the amount field after a short delay to ensure form is visible
-    setTimeout(() => {
-      amountInputRef.current?.focus();
-    }, 100);
+    setEditingExpense({
+      id: expense.id,
+      amount: expense.amount,
+      description: expense.description,
+    });
+    setShowExpenseModal(true);
   };
 
-  const handleCancelEdit = () => {
-    setEditingExpense(null);
-    setExpenseAmount('');
-    setExpenseDescription('');
-    setActiveField(null);
-    Keyboard.dismiss();
+  const handleExpenseSubmit = async (amount: number, description: string) => {
+    try {
+      if (editingExpense) {
+        await updateExpense(editingExpense.id, amount, description);
+      } else {
+        await addExpense(amount, description, createExpenseDate());
+      }
+    } catch (error) {
+      throw error; // Re-throw to let modal handle the error
+    }
   };
 
   const handleDeleteExpense = (expenseId: string) => {
@@ -505,41 +408,6 @@ export default function HomeScreen() {
         { text: 'Delete', style: 'destructive', onPress: () => deleteExpense(expenseId) },
       ]
     );
-  };
-
-  const handleAmountFocus = () => {
-    setActiveField('amount');
-  };
-
-  const handleDescriptionFocus = () => {
-    setActiveField('description');
-  };
-
-  const handleAmountSubmit = () => {
-    // Focus description field when amount is submitted
-    descriptionInputRef.current?.focus();
-  };
-
-  const handleDescriptionSubmit = () => {
-    // If amount is empty when description is submitted, focus amount field
-    if (!expenseAmount.trim()) {
-      amountInputRef.current?.focus();
-    } else {
-      // If amount is filled, submit the expense
-      handleAddExpense();
-    }
-  };
-
-  // NEW: Handle outside click to defocus form
-  const handleOutsidePress = () => {
-    if (activeField || isKeyboardVisible) {
-      setActiveField(null);
-      Keyboard.dismiss();
-      
-      // Blur both input fields
-      amountInputRef.current?.blur();
-      descriptionInputRef.current?.blur();
-    }
   };
 
   // FIXED: Web-compatible date picker handling with future date prevention
@@ -644,46 +512,6 @@ export default function HomeScreen() {
     );
   };
 
-  // Determine if we should show the input form
-  const shouldShowInputForm = viewMode === 'daily' || editingExpense;
-
-  // Dynamic z-index calculation based on input form state
-  const getToggleButtonZIndex = () => {
-    // When input form is active (keyboard visible or editing), toggle button should be behind
-    if (isKeyboardVisible || activeField || editingExpense) {
-      return Platform.select({
-        web: { zIndex: 900 }, // Lower than input form
-        default: { zIndex: 900, elevation: 900 },
-      });
-    }
-    
-    // When input form is not active, toggle button can be on top
-    return Platform.select({
-      web: { 
-        zIndex: 1020,
-        position: 'relative' as const,
-      },
-      default: { 
-        zIndex: 1020, 
-        elevation: 1020 
-      },
-    });
-  };
-
-  // Dynamic z-index for input form - always highest when active
-  const getInputFormZIndex = () => {
-    return Platform.select({
-      web: { 
-        zIndex: 2147483647, // Maximum z-index when active
-        position: 'relative' as const,
-      },
-      default: { 
-        zIndex: 999999, 
-        elevation: 999999 
-      },
-    });
-  };
-
   if (settingsLoading) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -697,370 +525,307 @@ export default function HomeScreen() {
   }
 
   return (
-    <TouchableWithoutFeedback onPress={handleOutsidePress}>
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <SafeAreaView style={styles.safeContainer}>
-          <KeyboardAvoidingView 
-            style={styles.keyboardContainer} 
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            keyboardVerticalOffset={0}
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <SafeAreaView style={styles.safeContainer}>
+        {/* Header */}
+        <View style={[styles.header, { paddingTop: Math.max(insets.top, 20) }]}>
+          <HeaderBrand
+            isOpen={showSidebar}
+            onPress={() => setShowSidebar(true)}
+          />
+        </View>
+
+        {/* Date Selector with Navigation */}
+        <View style={styles.dateNavigationContainer}>
+          <TouchableOpacity 
+            style={styles.navButton}
+            onPress={() => navigatePeriod('prev')}
+            activeOpacity={0.7}
           >
-            {/* Header */}
-            <View style={[styles.header, { paddingTop: Math.max(insets.top, 20) }]}>
-              <HeaderBrand
-                isOpen={showSidebar}
-                onPress={() => setShowSidebar(true)}
-              />
-            </View>
+            <ChevronLeft size={20} color={colors.text} />
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.dateSelector}
+            onPress={handleDatePickerPress}
+            activeOpacity={0.7}
+          >
+            <Calendar size={20} color={colors.text} />
+            <Text style={[styles.dateText, { color: colors.text }]}>{getPeriodLabel()}</Text>
+            <ChevronDown size={20} color={colors.text} />
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={[
+              styles.navButton,
+              isNextDisabled() && styles.navButtonDisabled
+            ]}
+            onPress={() => navigatePeriod('next')}
+            activeOpacity={isNextDisabled() ? 1 : 0.7}
+            disabled={isNextDisabled()}
+          >
+            <ChevronRight 
+              size={20} 
+              color={isNextDisabled() ? colors.textSecondary + '50' : colors.text} 
+            />
+          </TouchableOpacity>
+        </View>
 
-            {/* Date Selector with Navigation */}
-            <View style={styles.dateNavigationContainer}>
-              <TouchableOpacity 
-                style={styles.navButton}
-                onPress={() => navigatePeriod('prev')}
-                activeOpacity={0.7}
-              >
-                <ChevronLeft size={20} color={colors.text} />
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={styles.dateSelector}
-                onPress={handleDatePickerPress}
-                activeOpacity={0.7}
-              >
-                <Calendar size={20} color={colors.text} />
-                <Text style={[styles.dateText, { color: colors.text }]}>{getPeriodLabel()}</Text>
-                <ChevronDown size={20} color={colors.text} />
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={[
-                  styles.navButton,
-                  isNextDisabled() && styles.navButtonDisabled
-                ]}
-                onPress={() => navigatePeriod('next')}
-                activeOpacity={isNextDisabled() ? 1 : 0.7}
-                disabled={isNextDisabled()}
-              >
-                <ChevronRight 
-                  size={20} 
-                  color={isNextDisabled() ? colors.textSecondary + '50' : colors.text} 
-                />
-              </TouchableOpacity>
-            </View>
+        {/* NEW: Divider between date header and tabs */}
+        <View style={[styles.divider, { backgroundColor: colors.border }]} />
 
-            {/* NEW: Divider between date header and tabs */}
-            <View style={[styles.divider, { backgroundColor: colors.border }]} />
+        {/* Tabs - Weekly, Daily, Monthly */}
+        <View style={styles.tabsContainer}>
+          <TouchableOpacity
+            style={[
+              styles.tab,
+              viewMode === 'weekly' && { borderBottomColor: colors.primary, borderBottomWidth: 2 }
+            ]}
+            onPress={() => setViewMode('weekly')}
+            activeOpacity={0.7}
+          >
+            <Text
+              style={[
+                styles.tabText,
+                { color: viewMode === 'weekly' ? colors.primary : colors.textSecondary }
+              ]}
+            >
+              Weekly
+            </Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            style={[
+              styles.tab,
+              viewMode === 'daily' && { borderBottomColor: colors.primary, borderBottomWidth: 2 }
+            ]}
+            onPress={() => setViewMode('daily')}
+            activeOpacity={0.7}
+          >
+            <Text
+              style={[
+                styles.tabText,
+                { color: viewMode === 'daily' ? colors.primary : colors.textSecondary }
+              ]}
+            >
+              Daily
+            </Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            style={[
+              styles.tab,
+              viewMode === 'monthly' && { borderBottomColor: colors.primary, borderBottomWidth: 2 }
+            ]}
+            onPress={() => setViewMode('monthly')}
+            activeOpacity={0.7}
+          >
+            <Text
+              style={[
+                styles.tabText,
+                { color: viewMode === 'monthly' ? colors.primary : colors.textSecondary }
+              ]}
+            >
+              Monthly
+            </Text>
+          </TouchableOpacity>
+        </View>
 
-            {/* Tabs - Weekly, Daily, Monthly */}
-            <View style={styles.tabsContainer}>
-              <TouchableOpacity
-                style={[
-                  styles.tab,
-                  viewMode === 'weekly' && { borderBottomColor: colors.primary, borderBottomWidth: 2 }
-                ]}
-                onPress={() => setViewMode('weekly')}
-                activeOpacity={0.7}
-              >
-                <Text
-                  style={[
-                    styles.tabText,
-                    { color: viewMode === 'weekly' ? colors.primary : colors.textSecondary }
-                  ]}
-                >
-                  Weekly
-                </Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity
-                style={[
-                  styles.tab,
-                  viewMode === 'daily' && { borderBottomColor: colors.primary, borderBottomWidth: 2 }
-                ]}
-                onPress={() => setViewMode('daily')}
-                activeOpacity={0.7}
-              >
-                <Text
-                  style={[
-                    styles.tabText,
-                    { color: viewMode === 'daily' ? colors.primary : colors.textSecondary }
-                  ]}
-                >
-                  Daily
-                </Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity
-                style={[
-                  styles.tab,
-                  viewMode === 'monthly' && { borderBottomColor: colors.primary, borderBottomWidth: 2 }
-                ]}
-                onPress={() => setViewMode('monthly')}
-                activeOpacity={0.7}
-              >
-                <Text
-                  style={[
-                    styles.tabText,
-                    { color: viewMode === 'monthly' ? colors.primary : colors.textSecondary }
-                  ]}
-                >
-                  Monthly
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* FIXED: Sticky Header - completely hidden when not in use and no flash */}
-            {showDetails && (
-              <Animated.View 
-                style={[
-                  styles.fixedStickyHeader,
-                  { 
-                    backgroundColor: colors.background,
-                    borderBottomColor: colors.border,
-                    opacity: stickyHeaderOpacity,
-                    transform: [
-                      { scale: stickyHeaderScale },
-                      { translateY: stickyHeaderTranslateY }
-                    ]
-                  }
-                ]}
-                pointerEvents={showDetails ? 'auto' : 'none'}
-              >
-                <View style={styles.stickyContent}>
-                  <View style={[styles.amountBackground, { backgroundColor: colors.primary }]}>
-                    <Text style={[styles.stickyAmount, { color: colors.background }]}>
-                      {formatCurrency(currentTotal)}
-                    </Text>
-                  </View>
-                </View>
-              </Animated.View>
-            )}
-
-            <View style={styles.content}>
-              {/* Main Amount Display - Always rendered but animated */}
-              <Animated.View 
-                style={[
-                  styles.amountContainer,
-                  {
-                    transform: [
-                      { translateY: mainAmountTranslateY },
-                      { scale: mainAmountScale }
-                    ],
-                    opacity: mainAmountOpacity,
-                  }
-                ]}
-              >
-                <Text style={[styles.mainAmount, { color: colors.text }]}>
+        {/* FIXED: Sticky Header - completely hidden when not in use and no flash */}
+        {showDetails && (
+          <Animated.View 
+            style={[
+              styles.fixedStickyHeader,
+              { 
+                backgroundColor: colors.background,
+                borderBottomColor: colors.border,
+                opacity: stickyHeaderOpacity,
+                transform: [
+                  { scale: stickyHeaderScale },
+                  { translateY: stickyHeaderTranslateY }
+                ]
+              }
+            ]}
+            pointerEvents={showDetails ? 'auto' : 'none'}
+          >
+            <View style={styles.stickyContent}>
+              <View style={[styles.amountBackground, { backgroundColor: colors.primary }]}>
+                <Text style={[styles.stickyAmount, { color: colors.background }]}>
                   {formatCurrency(currentTotal)}
                 </Text>
-                <Text style={[styles.comparison, { color: colors.textSecondary }]}>
-                  vs. yesterday {formatCurrencyDetailed(yesterdayTotal)}
-                </Text>
-              </Animated.View>
+              </View>
+            </View>
+          </Animated.View>
+        )}
 
-              {/* Animated Toggle Button */}
-              <Animated.View
-                style={[
-                  styles.toggleButtonContainer,
-                  getToggleButtonZIndex(),
-                  {
-                    transform: [
-                      { translateY: toggleButtonTranslateY },
-                      { scale: toggleButtonScale }
-                    ],
-                    opacity: toggleButtonOpacity,
-                  }
-                ]}
-              >
-                <TouchableOpacity 
-                  style={[styles.toggleButton, { backgroundColor: colors.cardBackground, shadowColor: colors.shadowColor }]}
-                  onPress={() => setShowDetails(!showDetails)}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[styles.toggleButtonText, { color: colors.textSecondary }]}>
-                    {showDetails ? 'hide details' : 'show details'}
-                  </Text>
-                  {showDetails ? (
-                    <ChevronUp size={12} color={colors.textSecondary} />
-                  ) : (
-                    <ChevronDown size={12} color={colors.textSecondary} />
-                  )}
-                </TouchableOpacity>
-              </Animated.View>
+        <View style={styles.content}>
+          {/* Main Amount Display - Always rendered but animated */}
+          <Animated.View 
+            style={[
+              styles.amountContainer,
+              {
+                transform: [
+                  { translateY: mainAmountTranslateY },
+                  { scale: mainAmountScale }
+                ],
+                opacity: mainAmountOpacity,
+              }
+            ]}
+          >
+            <Text style={[styles.mainAmount, { color: colors.text }]}>
+              {formatCurrency(currentTotal)}
+            </Text>
+            <Text style={[styles.comparison, { color: colors.textSecondary }]}>
+              vs. yesterday {formatCurrencyDetailed(yesterdayTotal)}
+            </Text>
+          </Animated.View>
 
-              {/* Animated Details Content */}
-              <Animated.View
-                style={[
-                  styles.detailsContainer,
-                  {
-                    transform: [{ translateY: detailsTranslateY }],
-                    opacity: detailsOpacity,
-                  }
-                ]}
-                pointerEvents={showDetails ? 'auto' : 'none'}
-              >
-                <Animated.ScrollView
-                  style={styles.detailsScrollView}
-                  onScroll={Animated.event(
-                    [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-                    { useNativeDriver: false }
-                  )}
-                  scrollEventThrottle={16}
-                  showsVerticalScrollIndicator={false}
-                  contentContainerStyle={{
-                    paddingBottom: shouldShowInputForm ? 240 + insets.bottom : 40 + insets.bottom,
-                    paddingTop: 80, // Extra padding to account for the toggle button
-                  }}
-                >
-                  {/* Expense List with Date Headers */}
-                  <View style={styles.expenseList}>
-                    {groupedExpenses().map((group, groupIndex) => (
-                      <View key={groupIndex}>
-                        {renderDateHeader(group.date)}
-                        {group.expenses.map((expense) => (
-                          <View key={expense.id} style={[styles.expenseItem, { borderBottomColor: colors.border }]}>
-                            <View style={styles.expenseInfo}>
-                              <View style={styles.expenseHeader}>
-                                <Text style={[styles.expenseAmount, { color: colors.text }]}>
-                                  {formatCurrencyCompact(expense.amount)}
-                                </Text>
-                              </View>
-                              <Text style={[styles.expenseDescription, { color: colors.textSecondary }]}>
-                                {expense.description}
-                              </Text>
-                            </View>
-                            <View style={styles.expenseRightSection}>
-                              <Text style={[styles.expenseTime, { color: colors.textSecondary }]}>
-                                {format(new Date(expense.created_at), 'h:mm a')}
-                              </Text>
-                              <View style={styles.expenseActions}>
-                                <TouchableOpacity 
-                                  style={[styles.actionButton, styles.editButton, { backgroundColor: colors.primary + '15' }]}
-                                  onPress={() => handleEditExpense(expense)}
-                                  activeOpacity={0.7}
-                                >
-                                  <Edit size={16} color={colors.primary} />
-                                </TouchableOpacity>
-                                <TouchableOpacity 
-                                  style={[styles.actionButton, styles.deleteButton, { backgroundColor: colors.error + '15' }]}
-                                  onPress={() => handleDeleteExpense(expense.id)}
-                                  activeOpacity={0.7}
-                                >
-                                  <Trash2 size={16} color={colors.error} />
-                                </TouchableOpacity>
-                              </View>
-                            </View>
+          {/* Animated Toggle Button */}
+          <Animated.View
+            style={[
+              styles.toggleButtonContainer,
+              {
+                transform: [
+                  { translateY: toggleButtonTranslateY },
+                  { scale: toggleButtonScale }
+                ],
+                opacity: toggleButtonOpacity,
+              }
+            ]}
+          >
+            <TouchableOpacity 
+              style={[styles.toggleButton, { backgroundColor: colors.cardBackground, shadowColor: colors.shadowColor }]}
+              onPress={() => setShowDetails(!showDetails)}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.toggleButtonText, { color: colors.textSecondary }]}>
+                {showDetails ? 'hide details' : 'show details'}
+              </Text>
+              {showDetails ? (
+                <ChevronUp size={12} color={colors.textSecondary} />
+              ) : (
+                <ChevronDown size={12} color={colors.textSecondary} />
+              )}
+            </TouchableOpacity>
+          </Animated.View>
+
+          {/* Animated Details Content */}
+          <Animated.View
+            style={[
+              styles.detailsContainer,
+              {
+                transform: [{ translateY: detailsTranslateY }],
+                opacity: detailsOpacity,
+              }
+            ]}
+            pointerEvents={showDetails ? 'auto' : 'none'}
+          >
+            <Animated.ScrollView
+              style={styles.detailsScrollView}
+              onScroll={Animated.event(
+                [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+                { useNativeDriver: false }
+              )}
+              scrollEventThrottle={16}
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{
+                paddingBottom: 40 + insets.bottom,
+                paddingTop: 80, // Extra padding to account for the toggle button
+              }}
+            >
+              {/* Expense List with Date Headers */}
+              <View style={styles.expenseList}>
+                {groupedExpenses().map((group, groupIndex) => (
+                  <View key={groupIndex}>
+                    {renderDateHeader(group.date)}
+                    {group.expenses.map((expense) => (
+                      <View key={expense.id} style={[styles.expenseItem, { borderBottomColor: colors.border }]}>
+                        <View style={styles.expenseInfo}>
+                          <View style={styles.expenseHeader}>
+                            <Text style={[styles.expenseAmount, { color: colors.text }]}>
+                              {formatCurrencyCompact(expense.amount)}
+                            </Text>
                           </View>
-                        ))}
+                          <Text style={[styles.expenseDescription, { color: colors.textSecondary }]}>
+                            {expense.description}
+                          </Text>
+                        </View>
+                        <View style={styles.expenseRightSection}>
+                          <Text style={[styles.expenseTime, { color: colors.textSecondary }]}>
+                            {format(new Date(expense.created_at), 'h:mm a')}
+                          </Text>
+                          <View style={styles.expenseActions}>
+                            <TouchableOpacity 
+                              style={[styles.actionButton, styles.editButton, { backgroundColor: colors.primary + '15' }]}
+                              onPress={() => handleEditExpense(expense)}
+                              activeOpacity={0.7}
+                            >
+                              <Edit size={16} color={colors.primary} />
+                            </TouchableOpacity>
+                            <TouchableOpacity 
+                              style={[styles.actionButton, styles.deleteButton, { backgroundColor: colors.error + '15' }]}
+                              onPress={() => handleDeleteExpense(expense.id)}
+                              activeOpacity={0.7}
+                            >
+                              <Trash2 size={16} color={colors.error} />
+                            </TouchableOpacity>
+                          </View>
+                        </View>
                       </View>
                     ))}
                   </View>
-                </Animated.ScrollView>
-              </Animated.View>
-            </View>
+                ))}
+              </View>
+            </Animated.ScrollView>
+          </Animated.View>
+        </View>
 
-            {/* Input Form - Show in daily mode or when editing */}
-            {shouldShowInputForm && (
-              <Animated.View 
-                style={[
-                  styles.inputContainer,
-                  getInputFormZIndex(),
-                  { 
-                    backgroundColor: colors.background,
-                    borderTopColor: colors.border,
-                    paddingBottom: Math.max(insets.bottom + 40, 20),
-                    transform: [{ translateY: inputFormTranslateY }],
-                    shadowColor: colors.shadowColor,
-                  }
-                ]}
-              >
-                <TouchableWithoutFeedback>
-                  <View style={styles.inputFormContent}>
-                    <View style={styles.inputRow}>
-                      <TextInput
-                        ref={amountInputRef}
-                        style={[styles.expenseInput, { 
-                          borderColor: colors.border, 
-                          color: colors.text,
-                          backgroundColor: colors.inputBackground 
-                        }]}
-                        placeholder="Amount"
-                        placeholderTextColor={colors.textSecondary}
-                        value={expenseAmount}
-                        onChangeText={setExpenseAmount}
-                        keyboardType="numeric"
-                        returnKeyType="next"
-                        onSubmitEditing={handleAmountSubmit}
-                        onFocus={handleAmountFocus}
-                        blurOnSubmit={false}
-                      />
-                      <TouchableOpacity
-                        style={[styles.submitButton, { backgroundColor: colors.primary }]}
-                        onPress={handleAddExpense}
-                        activeOpacity={0.8}
-                      >
-                        {editingExpense ? (
-                          <Check size={20} color={colors.background} />
-                        ) : (
-                          <Plus size={20} color={colors.background} />
-                        )}
-                      </TouchableOpacity>
-                    </View>
-                    <View style={styles.descriptionRow}>
-                      <TextInput
-                        ref={descriptionInputRef}
-                        style={[styles.descriptionInput, { 
-                          borderColor: colors.border, 
-                          color: colors.text,
-                          backgroundColor: colors.inputBackground 
-                        }]}
-                        placeholder="Description"
-                        placeholderTextColor={colors.textSecondary}
-                        value={expenseDescription}
-                        onChangeText={setExpenseDescription}
-                        returnKeyType="done"
-                        onSubmitEditing={handleDescriptionSubmit}
-                        onFocus={handleDescriptionFocus}
-                      />
-                      {editingExpense && (
-                        <TouchableOpacity
-                          style={[styles.cancelButton, { borderColor: colors.border }]}
-                          onPress={handleCancelEdit}
-                          activeOpacity={0.7}
-                        >
-                          <Text style={[styles.cancelButtonText, { color: colors.textSecondary }]}>
-                            Cancel
-                          </Text>
-                        </TouchableOpacity>
-                      )}
-                    </View>
-                  </View>
-                </TouchableWithoutFeedback>
-              </Animated.View>
-            )}
+        {/* FIXED: Floating Add Button - Positioned higher from bottom */}
+        {viewMode === 'daily' && (
+          <TouchableOpacity
+            style={[
+              styles.floatingAddButton, 
+              { 
+                backgroundColor: colors.primary, 
+                shadowColor: colors.shadowColor,
+                bottom: 50 + insets.bottom, // FIXED: Moved higher from bottom
+              }
+            ]}
+            onPress={handleAddExpense}
+            activeOpacity={0.8}
+          >
+            <Plus size={24} color={colors.background} />
+          </TouchableOpacity>
+        )}
 
-            {/* Date Picker - Only show on mobile platforms with future date prevention */}
-            {showDatePicker && Platform.OS !== 'web' && (
-              <DateTimePicker
-                value={selectedDate}
-                mode="date"
-                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                onChange={handleDateChange}
-                maximumDate={new Date()} // FIXED: Prevent future date selection
-              />
-            )}
+        {/* Date Picker - Only show on mobile platforms with future date prevention */}
+        {showDatePicker && Platform.OS !== 'web' && (
+          <DateTimePicker
+            value={selectedDate}
+            mode="date"
+            display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+            onChange={handleDateChange}
+            maximumDate={new Date()} // FIXED: Prevent future date selection
+          />
+        )}
 
-            {/* Sidebar */}
-            {showSidebar && (
-              <Sidebar
-                visible={showSidebar}
-                onClose={() => setShowSidebar(false)}
-              />
-            )}
-          </KeyboardAvoidingView>
-        </SafeAreaView>
-      </View>
-    </TouchableWithoutFeedback>
+        {/* Expense Modal */}
+        <ExpenseModal
+          visible={showExpenseModal}
+          onClose={() => setShowExpenseModal(false)}
+          onSubmit={handleExpenseSubmit}
+          editingExpense={editingExpense}
+        />
+
+        {/* Sidebar */}
+        {showSidebar && (
+          <Sidebar
+            visible={showSidebar}
+            onClose={() => setShowSidebar(false)}
+          />
+        )}
+      </SafeAreaView>
+    </View>
   );
 }
 
@@ -1069,9 +834,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   safeContainer: {
-    flex: 1,
-  },
-  keyboardContainer: {
     flex: 1,
   },
   loadingContainer: {
@@ -1307,66 +1069,17 @@ const styles = StyleSheet.create({
   deleteButton: {
     // Background color set inline
   },
-  inputContainer: {
+  floatingAddButton: {
     position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    paddingHorizontal: 20,
-    paddingVertical: 24,
-    borderTopWidth: 1,
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 12,
-  },
-  // FIXED: New wrapper for input form content with proper gap
-  inputFormContent: {
-    gap: 16, // This adds the gap between the two rows
-  },
-  inputRow: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  expenseInput: {
-    flex: 1,
-    height: 52,
-    borderWidth: 1,
-    borderRadius: 16,
-    paddingHorizontal: 20,
-    fontSize: 16,
-    fontFamily: 'Inter-Regular',
-  },
-  submitButton: {
-    width: 52,
-    height: 52,
-    borderRadius: 16,
+    right: 20,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  descriptionRow: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  descriptionInput: {
-    flex: 1,
-    height: 52,
-    borderWidth: 1,
-    borderRadius: 16,
-    paddingHorizontal: 20,
-    fontSize: 16,
-    fontFamily: 'Inter-Regular',
-  },
-  cancelButton: {
-    paddingHorizontal: 20,
-    height: 52,
-    borderWidth: 1,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cancelButtonText: {
-    fontSize: 14,
-    fontFamily: 'Inter-Medium',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
   },
 });
