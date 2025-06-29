@@ -113,6 +113,7 @@ export default function ResetConfirmationModal({
     transform: [{ scale: modalScale.value }],
   }));
 
+  // FIXED: Don't render the modal at all when not visible to prevent layout shifts
   if (!visible) {
     return null;
   }
@@ -124,141 +125,160 @@ export default function ResetConfirmationModal({
       animationType="none"
       onRequestClose={onClose}
       statusBarTranslucent={Platform.OS === 'android'}
+      // CRITICAL FIX: Use overFullScreen to prevent layout interference
+      presentationStyle="overFullScreen"
+      // CRITICAL FIX: Prevent modal from affecting layout
+      supportedOrientations={['portrait']}
     >
       <StatusBar 
         style={theme === 'dark' ? 'light' : 'dark'} 
         backgroundColor="rgba(0,0,0,0.5)"
       />
       
-      <Animated.View style={[styles.backdrop, backdropStyle]}>
-        <TouchableWithoutFeedback onPress={handleBackdropPress}>
-          <View style={styles.backdropTouchable} />
-        </TouchableWithoutFeedback>
+      {/* FIXED: Container that doesn't interfere with main content */}
+      <View style={styles.modalContainer}>
+        <Animated.View style={[styles.backdrop, backdropStyle]}>
+          <TouchableWithoutFeedback onPress={handleBackdropPress}>
+            <View style={styles.backdropTouchable} />
+          </TouchableWithoutFeedback>
 
-        <KeyboardAvoidingView 
-          style={styles.container}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
-        >
-          <Animated.View 
-            style={[
-              styles.modal,
-              { 
-                backgroundColor: colors.surface,
-                shadowColor: colors.shadowColor,
-              },
-              modalStyle
-            ]}
+          <KeyboardAvoidingView 
+            style={styles.container}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
           >
-            {/* Header */}
-            <View style={[styles.header, { borderBottomColor: colors.border }]}>
-              <View style={styles.headerLeft}>
-                <View style={[styles.warningIcon, { backgroundColor: '#ef4444' + '15' }]}>
-                  <AlertTriangle size={24} color="#ef4444" />
+            <Animated.View 
+              style={[
+                styles.modal,
+                { 
+                  backgroundColor: colors.surface,
+                  shadowColor: colors.shadowColor,
+                },
+                modalStyle
+              ]}
+            >
+              {/* Header */}
+              <View style={[styles.header, { borderBottomColor: colors.border }]}>
+                <View style={styles.headerLeft}>
+                  <View style={[styles.warningIcon, { backgroundColor: '#ef4444' + '15' }]}>
+                    <AlertTriangle size={24} color="#ef4444" />
+                  </View>
+                  <Text style={[styles.title, { color: colors.text }]}>
+                    Reset App Data
+                  </Text>
                 </View>
-                <Text style={[styles.title, { color: colors.text }]}>
-                  Reset App Data
-                </Text>
-              </View>
-              <TouchableOpacity 
-                onPress={onClose}
-                style={styles.closeButton}
-                disabled={isProcessing}
-              >
-                <X size={24} color={colors.textSecondary} />
-              </TouchableOpacity>
-            </View>
-
-            {/* Content */}
-            <View style={styles.content}>
-              <Text style={[styles.warningText, { color: '#ef4444' }]}>
-                ⚠️ This action cannot be undone
-              </Text>
-              
-              <Text style={[styles.description, { color: colors.textSecondary }]}>
-                This will permanently delete:
-              </Text>
-              
-              <View style={styles.itemsList}>
-                <Text style={[styles.listItem, { color: colors.textSecondary }]}>
-                  • All your expense records
-                </Text>
-                <Text style={[styles.listItem, { color: colors.textSecondary }]}>
-                  • All app settings and preferences
-                </Text>
-                <Text style={[styles.listItem, { color: colors.textSecondary }]}>
-                  • Currency and timezone settings
-                </Text>
-                <Text style={[styles.listItem, { color: colors.textSecondary }]}>
-                  • Theme preferences (reset to default)
-                </Text>
+                <TouchableOpacity 
+                  onPress={onClose}
+                  style={styles.closeButton}
+                  disabled={isProcessing}
+                >
+                  <X size={24} color={colors.textSecondary} />
+                </TouchableOpacity>
               </View>
 
-              <Text style={[styles.confirmationLabel, { color: colors.text }]}>
-                To confirm, type <Text style={[styles.confirmationPhrase, { color: '#ef4444' }]}>reset everything</Text> below:
-              </Text>
-
-              <TextInput
-                style={[
-                  styles.confirmationInput,
-                  {
-                    borderColor: isConfirmationValid ? '#ef4444' : colors.border,
-                    backgroundColor: colors.inputBackground,
-                    color: colors.text,
-                  }
-                ]}
-                placeholder="Type 'reset everything' to confirm"
-                placeholderTextColor={colors.textSecondary}
-                value={confirmationText}
-                onChangeText={setConfirmationText}
-                autoCapitalize="none"
-                autoCorrect={false}
-                editable={!isProcessing}
-                autoFocus
-              />
-            </View>
-
-            {/* Actions */}
-            <View style={styles.actions}>
-              <TouchableOpacity
-                style={[
-                  styles.button,
-                  styles.cancelButton,
-                  { borderColor: colors.border }
-                ]}
-                onPress={onClose}
-                disabled={isProcessing}
-              >
-                <Text style={[styles.cancelButtonText, { color: colors.textSecondary }]}>
-                  Cancel
+              {/* Content */}
+              <View style={styles.content}>
+                <Text style={[styles.warningText, { color: '#ef4444' }]}>
+                  ⚠️ This action cannot be undone
                 </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[
-                  styles.button,
-                  styles.resetButton,
-                  { 
-                    backgroundColor: isConfirmationValid ? '#ef4444' : colors.border,
-                    opacity: isConfirmationValid ? 1 : 0.5,
-                  }
-                ]}
-                onPress={handleConfirm}
-                disabled={!isConfirmationValid || isProcessing}
-              >
-                <Text style={[styles.resetButtonText, { color: '#ffffff' }]}>
-                  {isProcessing ? 'Resetting...' : 'Reset Everything'}
+                
+                <Text style={[styles.description, { color: colors.textSecondary }]}>
+                  This will permanently delete:
                 </Text>
-              </TouchableOpacity>
-            </View>
-          </Animated.View>
-        </KeyboardAvoidingView>
-      </Animated.View>
+                
+                <View style={styles.itemsList}>
+                  <Text style={[styles.listItem, { color: colors.textSecondary }]}>
+                    • All your expense records
+                  </Text>
+                  <Text style={[styles.listItem, { color: colors.textSecondary }]}>
+                    • All app settings and preferences
+                  </Text>
+                  <Text style={[styles.listItem, { color: colors.textSecondary }]}>
+                    • Currency and timezone settings
+                  </Text>
+                  <Text style={[styles.listItem, { color: colors.textSecondary }]}>
+                    • Theme preferences (reset to default)
+                  </Text>
+                </View>
+
+                <Text style={[styles.confirmationLabel, { color: colors.text }]}>
+                  To confirm, type <Text style={[styles.confirmationPhrase, { color: '#ef4444' }]}>reset everything</Text> below:
+                </Text>
+
+                <TextInput
+                  style={[
+                    styles.confirmationInput,
+                    {
+                      borderColor: isConfirmationValid ? '#ef4444' : colors.border,
+                      backgroundColor: colors.inputBackground,
+                      color: colors.text,
+                    }
+                  ]}
+                  placeholder="Type 'reset everything' to confirm"
+                  placeholderTextColor={colors.textSecondary}
+                  value={confirmationText}
+                  onChangeText={setConfirmationText}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  editable={!isProcessing}
+                  autoFocus
+                />
+              </View>
+
+              {/* Actions */}
+              <View style={styles.actions}>
+                <TouchableOpacity
+                  style={[
+                    styles.button,
+                    styles.cancelButton,
+                    { borderColor: colors.border }
+                  ]}
+                  onPress={onClose}
+                  disabled={isProcessing}
+                >
+                  <Text style={[styles.cancelButtonText, { color: colors.textSecondary }]}>
+                    Cancel
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.button,
+                    styles.resetButton,
+                    { 
+                      backgroundColor: isConfirmationValid ? '#ef4444' : colors.border,
+                      opacity: isConfirmationValid ? 1 : 0.5,
+                    }
+                  ]}
+                  onPress={handleConfirm}
+                  disabled={!isConfirmationValid || isProcessing}
+                >
+                  <Text style={[styles.resetButtonText, { color: '#ffffff' }]}>
+                    {isProcessing ? 'Resetting...' : 'Reset Everything'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </Animated.View>
+          </KeyboardAvoidingView>
+        </Animated.View>
+      </View>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
+  // CRITICAL FIX: Modal container that doesn't affect layout
+  modalContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
+    // FIXED: Ensure modal doesn't interfere with main content
+    zIndex: 9999,
+  },
   backdrop: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
@@ -274,7 +294,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 40,
     // FIXED: Position modal higher from center
-    marginTop: -240, // Moved higher from center
+    marginTop: -120, // Moved higher from center
   },
   modal: {
     width: Math.min(width - 40, 450),

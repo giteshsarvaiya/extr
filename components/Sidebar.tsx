@@ -166,6 +166,7 @@ export default function Sidebar({ visible, onClose }: SidebarProps) {
     onClose();
   };
 
+  // FIXED: Don't render the modal at all when not visible to prevent layout shifts
   if (!visible) return null;
 
   return (
@@ -175,13 +176,20 @@ export default function Sidebar({ visible, onClose }: SidebarProps) {
       animationType="none"
       onRequestClose={onClose}
       hardwareAccelerated={true}
+      // CRITICAL FIX: Use overFullScreen to prevent layout interference
+      presentationStyle="overFullScreen"
+      statusBarTranslucent={false}
+      // CRITICAL FIX: Prevent modal from affecting layout
+      supportedOrientations={['portrait']}
     >
       <StatusBar 
-        style={theme === 'dark' ? 'dark' : 'light'} 
+        style={theme === 'dark' ? 'light' : 'dark'} 
         backgroundColor={colors.statusBarBackground}
+        translucent={false}
       />
       
-      <View style={styles.overlay}>
+      {/* FIXED: Container that doesn't interfere with main content */}
+      <View style={styles.modalContainer}>
         {/* Backdrop */}
         <Animated.View style={[styles.backdrop, backdropStyle]}>
           <TouchableOpacity 
@@ -202,10 +210,10 @@ export default function Sidebar({ visible, onClose }: SidebarProps) {
               sidebarStyle
             ]}
           >
-            {/* FIXED: Use SafeAreaView to properly handle safe areas */}
-            <SafeAreaView style={styles.safeAreaContainer}>
+            {/* FIXED: SafeAreaView inside sidebar for proper safe area handling */}
+            <SafeAreaView style={styles.sidebarSafeArea}>
               <View style={styles.sidebarContent}>
-                {/* Header - Starts from top of safe area */}
+                {/* Header */}
                 <View style={[styles.header, { borderBottomColor: colors.border }]}>
                   <TouchableOpacity 
                     style={styles.brandContainer}
@@ -232,7 +240,7 @@ export default function Sidebar({ visible, onClose }: SidebarProps) {
                   </TouchableOpacity>
                 </View>
 
-                {/* Menu Items - Takes up available space between header and footer */}
+                {/* Menu Items */}
                 <View style={styles.menuContainer}>
                   {MENU_ITEMS.map((item, index) => {
                     const IconComponent = item.icon;
@@ -262,7 +270,7 @@ export default function Sidebar({ visible, onClose }: SidebarProps) {
                   })}
                 </View>
 
-                {/* Footer - Stays at bottom of safe area */}
+                {/* Footer */}
                 <View style={styles.footer}>
                   <Text style={[styles.footerText, { color: colors.textSecondary }]}>
                     Version 1.0.0
@@ -281,15 +289,30 @@ export default function Sidebar({ visible, onClose }: SidebarProps) {
 }
 
 const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
+  // CRITICAL FIX: Modal container that doesn't affect layout
+  modalContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
+    // FIXED: Ensure modal doesn't interfere with main content
+    zIndex: 9999,
   },
   backdrop: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     backgroundColor: 'rgba(0,0,0,0.6)',
   },
   backdropTouchable: {
     flex: 1,
+    width: '100%',
+    height: '100%',
   },
   sidebar: {
     position: 'absolute',
@@ -303,12 +326,13 @@ const styles = StyleSheet.create({
     shadowRadius: 16,
     elevation: 16,
   },
-  safeAreaContainer: {
+  // FIXED: SafeAreaView wrapper for proper safe area handling
+  sidebarSafeArea: {
     flex: 1,
   },
   sidebarContent: {
     flex: 1,
-    justifyContent: 'space-between', // Header at top, footer at bottom
+    justifyContent: 'space-between',
   },
   header: {
     flexDirection: 'row',
@@ -353,7 +377,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   menuContainer: {
-    flex: 1, // Takes up all available space between header and footer
+    flex: 1,
     paddingTop: 8,
   },
   menuItem: {

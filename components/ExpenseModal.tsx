@@ -344,7 +344,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 40,
     // FIXED: Position modal higher from center
-    marginTop: -200, // This moves the modal up by 80px from center
+    marginTop: -140, // This moves the modal up by 80px from center
   },
   modal: {
     width: Math.min(width - 40, 400),
