@@ -14,7 +14,7 @@ import { useRouter } from 'expo-router';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useExpense } from '@/contexts/ExpenseContext';
 import { useSettings } from '@/contexts/SettingsContext';
-import { ChevronDown, ChevronUp, CreditCard as Edit, Trash2, Calendar, Plus, ChevronLeft, ChevronRight } from 'lucide-react-native';
+import { ChevronDown, ChevronUp, Edit, Trash2, Calendar, Plus, ChevronLeft, ChevronRight } from 'lucide-react-native';
 import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isToday, addDays, subDays, addWeeks, subWeeks, addMonths, subMonths, isSameDay, setHours, setMinutes, setSeconds, setMilliseconds, isAfter, isBefore } from 'date-fns';
 import Sidebar from '@/components/Sidebar';
 import HeaderBrand from '@/components/HeaderBrand';
