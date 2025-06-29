@@ -12,6 +12,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useSettings } from '@/contexts/SettingsContext';
+import { useExpense } from '@/contexts/ExpenseContext';
 import { 
   Palette, 
   Globe, 
@@ -26,6 +27,7 @@ import {
 import CustomModal from '@/components/CustomModal';
 import TimezoneSelector from '@/components/TimezoneSelector';
 import CurrencySelector from '@/components/CurrencySelector';
+import ResetConfirmationModal from '@/components/ResetConfirmationModal';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const THEMES = [
@@ -35,14 +37,16 @@ const THEMES = [
 ];
 
 export default function SettingsScreen() {
-  const { colors, theme, toggleTheme, changeTheme, variant } = useTheme();
+  const { colors, theme, toggleTheme, changeTheme, variant, resetTheme } = useTheme();
   const { userSettings, updateSettings, resetSettings } = useSettings();
+  const { clearAllExpenses } = useExpense();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   
   const [showThemeModal, setShowThemeModal] = useState(false);
   const [showTimezoneModal, setShowTimezoneModal] = useState(false);
   const [showCurrencyModal, setShowCurrencyModal] = useState(false);
+  const [showResetModal, setShowResetModal] = useState(false);
 
   const handleThemeSelect = (selectedVariant: string) => {
     changeTheme(selectedVariant as any);
@@ -59,29 +63,57 @@ export default function SettingsScreen() {
     });
   };
 
-  // ADDED: Reset app data function for debugging
+  // IMPROVED: Enhanced reset app data function with confirmation modal
   const handleResetAppData = () => {
-    Alert.alert(
-      'Reset App Data',
-      'This will clear all settings and expenses. This action cannot be undone. Are you sure?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Reset', 
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await resetSettings();
-              Alert.alert('Success', 'App data has been reset. The app will restart.');
+    setShowResetModal(true);
+  };
+
+  const performReset = async () => {
+    try {
+      // Show loading state
+      Alert.alert('Resetting...', 'Please wait while we reset your data.');
+      
+      // Clear all expenses first
+      await clearAllExpenses();
+      
+      // Reset all settings
+      await resetSettings();
+      
+      // FIXED: Reset theme preferences as well
+      await resetTheme();
+      
+      // Close the modal
+      setShowResetModal(false);
+      
+      // Success message
+      Alert.alert(
+        'Reset Complete', 
+        'All data has been cleared successfully. The app will now restart.',
+        [
+          {
+            text: 'OK',
+            onPress: () => {
               // Force navigation to setup
               router.replace('/setup');
-            } catch (error) {
-              Alert.alert('Error', 'Failed to reset app data');
             }
           }
-        },
-      ]
-    );
+        ]
+      );
+    } catch (error) {
+      console.error('Reset failed:', error);
+      setShowResetModal(false);
+      Alert.alert(
+        'Reset Failed', 
+        'There was an error resetting your data. Please try again or restart the app manually.',
+        [
+          { text: 'OK' },
+          {
+            text: 'Try Again',
+            onPress: handleResetAppData
+          }
+        ]
+      );
+    }
   };
 
   const SettingsItem = ({ 
@@ -189,19 +221,32 @@ export default function SettingsScreen() {
             />
           </View>
 
-          {/* ADDED: Debug Section (only in development) */}
-          {__DEV__ && (
-            <View style={styles.section}>
-              <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>DEBUG</Text>
-              
-              <SettingsItem
-                icon={<RotateCcw size={20} color={colors.error} />}
-                title="Reset App Data"
-                subtitle="Clear all settings and expenses"
-                onPress={handleResetAppData}
-              />
-            </View>
-          )}
+          {/* IMPROVED: Data Management Section with destructive styling */}
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
+              DATA MANAGEMENT
+            </Text>
+            
+            <TouchableOpacity 
+              style={[styles.settingsItem, { borderBottomColor: colors.border }]}
+              onPress={handleResetAppData}
+            >
+              <View style={styles.settingsItemLeft}>
+                <View style={[styles.iconContainer, { backgroundColor: '#ef4444' + '15' }]}>
+                  <RotateCcw size={20} color="#ef4444" />
+                </View>
+                <View>
+                  <Text style={[styles.settingsTitle, { color: '#ef4444' }]}>
+                    Reset App Data
+                  </Text>
+                  <Text style={[styles.settingsSubtitle, { color: colors.textSecondary }]}>
+                    Clear all expenses and settings
+                  </Text>
+                </View>
+              </View>
+              <ChevronRight size={20} color={colors.textSecondary} />
+            </TouchableOpacity>
+          </View>
 
           {/* About Section */}
           <View style={styles.section}>
@@ -248,6 +293,13 @@ export default function SettingsScreen() {
           onClose={() => setShowCurrencyModal(false)}
           selectedValue={userSettings.currency}
           onSelect={handleCurrencySelect}
+        />
+
+        {/* Reset Confirmation Modal */}
+        <ResetConfirmationModal
+          visible={showResetModal}
+          onClose={() => setShowResetModal(false)}
+          onConfirm={performReset}
         />
       </SafeAreaView>
     </View>

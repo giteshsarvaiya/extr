@@ -16,6 +16,7 @@ interface ExpenseContextType {
   deleteExpense: (id: string) => Promise<void>;
   getTotalForPeriod: (startDate: Date, endDate: Date) => number;
   refreshExpenses: () => Promise<void>;
+  clearAllExpenses: () => Promise<void>; // ADDED: Function to clear all expenses
 }
 
 const ExpenseContext = createContext<ExpenseContextType | undefined>(undefined);
@@ -122,6 +123,20 @@ export const ExpenseProvider = ({ children }: { children: ReactNode }) => {
     await loadExpenses();
   };
 
+  // ADDED: Function to clear all expenses
+  const clearAllExpenses = async () => {
+    try {
+      setExpenses([]);
+      await AsyncStorage.removeItem('expenses');
+      if (__DEV__) {
+        console.log('All expenses cleared');
+      }
+    } catch (error) {
+      console.error('Error clearing expenses:', error);
+      throw error;
+    }
+  };
+
   return (
     <ExpenseContext.Provider
       value={{
@@ -132,6 +147,7 @@ export const ExpenseProvider = ({ children }: { children: ReactNode }) => {
         deleteExpense,
         getTotalForPeriod,
         refreshExpenses,
+        clearAllExpenses,
       }}
     >
       {children}

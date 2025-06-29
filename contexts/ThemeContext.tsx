@@ -28,6 +28,7 @@ interface ThemeContextType {
   colors: Colors;
   toggleTheme: () => void;
   changeTheme: (variant: ThemeVariant) => void;
+  resetTheme: () => void; // ADDED: Function to reset theme to defaults
 }
 
 const lightColors: Record<ThemeVariant, Colors> = {
@@ -132,6 +133,10 @@ const darkColors: Record<ThemeVariant, Colors> = {
   },
 };
 
+// ADDED: Default theme values
+const DEFAULT_THEME: ThemeType = 'light';
+const DEFAULT_VARIANT: ThemeVariant = 'default';
+
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export const useTheme = () => {
@@ -143,8 +148,8 @@ export const useTheme = () => {
 };
 
 export const ThemeProvider = ({ children }: { children: ReactNode }) => {
-  const [theme, setTheme] = useState<ThemeType>('light');
-  const [variant, setVariant] = useState<ThemeVariant>('default');
+  const [theme, setTheme] = useState<ThemeType>(DEFAULT_THEME);
+  const [variant, setVariant] = useState<ThemeVariant>(DEFAULT_VARIANT);
   const [isLoaded, setIsLoaded] = useState(false);
 
   // Load theme preferences from storage
@@ -192,6 +197,25 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
     saveThemePreferences(theme, newVariant);
   };
 
+  // ADDED: Function to reset theme to defaults
+  const resetTheme = async () => {
+    try {
+      // Remove theme preferences from storage
+      await AsyncStorage.multiRemove(['theme', 'themeVariant']);
+      
+      // Reset to default values
+      setTheme(DEFAULT_THEME);
+      setVariant(DEFAULT_VARIANT);
+      
+      if (__DEV__) {
+        console.log('Theme reset to defaults');
+      }
+    } catch (error) {
+      console.error('Error resetting theme:', error);
+      throw error;
+    }
+  };
+
   const colors = theme === 'light' ? lightColors[variant] : darkColors[variant];
 
   // Don't render children until theme is loaded
@@ -207,6 +231,7 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
         colors,
         toggleTheme,
         changeTheme,
+        resetTheme, // ADDED: Expose reset function
       }}
     >
       {children}

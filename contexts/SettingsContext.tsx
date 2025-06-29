@@ -116,17 +116,39 @@ export const SettingsProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  // ADDED: Reset function for debugging
+  // IMPROVED: Enhanced reset function that clears settings but NOT theme preferences
+  // Theme preferences are now handled by the ThemeContext's resetTheme function
   const resetSettings = async () => {
     try {
-      await AsyncStorage.removeItem('userSettings');
-      setUserSettings(defaultSettings);
       if (__DEV__) {
-        console.log('Settings reset to defaults');
+        console.log('Starting settings reset...');
+      }
+
+      // Only remove user settings and expenses, NOT theme preferences
+      const keysToRemove = ['userSettings', 'expenses'];
+      await AsyncStorage.multiRemove(keysToRemove);
+      
+      // Reset settings to defaults
+      setUserSettings(defaultSettings);
+      
+      if (__DEV__) {
+        console.log('Settings reset completed successfully');
       }
     } catch (error) {
       console.error('Error resetting settings:', error);
-      throw error;
+      
+      // Fallback: try to clear individual keys
+      try {
+        await AsyncStorage.removeItem('userSettings');
+        setUserSettings(defaultSettings);
+        
+        if (__DEV__) {
+          console.log('Fallback settings reset completed');
+        }
+      } catch (fallbackError) {
+        console.error('Fallback settings reset also failed:', fallbackError);
+        throw new Error('Failed to reset settings');
+      }
     }
   };
 
