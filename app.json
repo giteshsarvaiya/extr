@@ -1,0 +1,53 @@
+{
+  "expo": {
+    "name": "ExTr - Expense Tracker",
+    "slug": "expense-tracker",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/android-chrome-512x512.png",
+    "scheme": "expense-tracker",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/images/android-chrome-192x192.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.extr.expensetracker",
+      "buildNumber": "1"
+    },
+    "android": {
+      "package": "com.extr.expensetracker",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/android-chrome-512x512.png",
+        "backgroundColor": "#000000"
+      },
+      "permissions": []
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single",
+      "favicon": "./assets/images/favicon-32x32.png"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-font",
+      "expo-web-browser"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "b97269e9-f30c-4d2f-94e8-bcf2bb7ae63e"
+      }
+    }
+  }
+}
