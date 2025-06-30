@@ -15,7 +15,7 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { useExpense } from '@/contexts/ExpenseContext';
 import { useSettings } from '@/contexts/SettingsContext';
 import { ChevronDown, ChevronUp, Edit, Trash2, Calendar, Plus, ChevronLeft, ChevronRight } from 'lucide-react-native';
-import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isToday, addDays, subDays, addWeeks, subWeeks, addMonths, subMonths, isSameDay, setHours, setMinutes, setSeconds, setMilliseconds, isAfter, isBefore } from 'date-fns';
+import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isToday, addDays, subDays, addWeeks, subWeeks, addMonths, subMonths, isSameDay, setHours, setMinutes, setSeconds, setMilliseconds, isAfter, isBefore, isSameWeek, isSameMonth } from 'date-fns';
 import Sidebar from '@/components/Sidebar';
 import HeaderBrand from '@/components/HeaderBrand';
 import ExpenseModal from '@/components/ExpenseModal';
@@ -351,11 +351,71 @@ export default function HomeScreen() {
     }
   };
 
-  const currentTotal = getTotalForPeriod(getPeriodRange().start, getPeriodRange().end);
-  const yesterdayTotal = getTotalForPeriod(
-    startOfDay(new Date(selectedDate.getTime() - 24 * 60 * 60 * 1000)),
-    endOfDay(new Date(selectedDate.getTime() - 24 * 60 * 60 * 1000))
-  );
+  // UPDATED: Enhanced comparison logic based on view mode and current period
+  const getComparisonData = () => {
+    const now = new Date();
+    const currentTotal = getTotalForPeriod(getPeriodRange().start, getPeriodRange().end);
+    
+    // Check if the selected period is current
+    const isCurrentPeriod = (() => {
+      switch (viewMode) {
+        case 'daily':
+          return isToday(selectedDate);
+        case 'weekly':
+          return isSameWeek(selectedDate, now);
+        case 'monthly':
+          return isSameMonth(selectedDate, now);
+        default:
+          return false;
+      }
+    })();
+
+    // If not current period, don't show comparison
+    if (!isCurrentPeriod) {
+      return {
+        currentTotal,
+        showComparison: false,
+        comparisonText: '',
+        comparisonAmount: 0
+      };
+    }
+
+    // Calculate comparison based on view mode
+    let comparisonAmount = 0;
+    let comparisonText = '';
+
+    switch (viewMode) {
+      case 'daily':
+        const yesterdayStart = startOfDay(subDays(selectedDate, 1));
+        const yesterdayEnd = endOfDay(subDays(selectedDate, 1));
+        comparisonAmount = getTotalForPeriod(yesterdayStart, yesterdayEnd);
+        comparisonText = 'vs. yesterday';
+        break;
+      
+      case 'weekly':
+        const lastWeekStart = startOfWeek(subWeeks(selectedDate, 1));
+        const lastWeekEnd = endOfWeek(subWeeks(selectedDate, 1));
+        comparisonAmount = getTotalForPeriod(lastWeekStart, lastWeekEnd);
+        comparisonText = 'vs. prev. week';
+        break;
+      
+      case 'monthly':
+        const lastMonthStart = startOfMonth(subMonths(selectedDate, 1));
+        const lastMonthEnd = endOfMonth(subMonths(selectedDate, 1));
+        comparisonAmount = getTotalForPeriod(lastMonthStart, lastMonthEnd);
+        comparisonText = 'vs. prev. month';
+        break;
+    }
+
+    return {
+      currentTotal,
+      showComparison: true,
+      comparisonText,
+      comparisonAmount
+    };
+  };
+
+  const { currentTotal, showComparison, comparisonText, comparisonAmount } = getComparisonData();
 
   // FIXED: Create expense date based on selected date
   const createExpenseDate = (): string => {
@@ -676,9 +736,6 @@ export default function HomeScreen() {
                   <Text style={[styles.stickyAmount, { color: colors.background }]}>
                     {formatCurrency(currentTotal)}
                   </Text>
-                  <Text style={[styles.comparison, { color: colors.background }]}>
-                    vs. yesterday {formatCurrencyDetailed(yesterdayTotal)}
-                  </Text>
                 </View>
               </View>
             </Animated.View>
@@ -702,9 +759,12 @@ export default function HomeScreen() {
               <Text style={[styles.mainAmount, { color: colors.text }]}>
                 {formatCurrency(currentTotal)}
               </Text>
-              <Text style={[styles.comparison, { color: colors.textSecondary }]}>
-                vs. yesterday {formatCurrencyDetailed(yesterdayTotal)}
-              </Text>
+              {/* UPDATED: Conditional comparison display */}
+              {showComparison && (
+                <Text style={[styles.comparison, { color: colors.textSecondary }]}>
+                  {comparisonText} {formatCurrencyDetailed(comparisonAmount)}
+                </Text>
+              )}
             </Animated.View>
 
             {/* FIXED: Animated Toggle Button - Highest z-index to stay above everything */}
@@ -976,10 +1036,6 @@ const styles = StyleSheet.create({
     minHeight: 60,
   },
   amountBackground: {
-    flexDirection: 'column',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 10,
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 20,
@@ -998,10 +1054,7 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   amountContainer: {
-    flexDirection: 'column',
-    justifyContent: 'center',
     alignItems: 'center',
-    gap: 24,
     paddingVertical: 60,
   },
   mainAmount: {
