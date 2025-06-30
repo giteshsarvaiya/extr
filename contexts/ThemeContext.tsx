@@ -108,7 +108,7 @@ const darkColors: Record<ThemeVariant, Colors> = {
     text: '#f1f5f9',
     textSecondary: '#94a3b8',
     border: '#334155',
-    statusBarBackground: '#112240 ',
+    statusBarBackground: '#112240',
     accent: '#3b82f6',
     success: '#10b981',
     warning: '#f59e0b',
