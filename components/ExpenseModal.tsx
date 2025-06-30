@@ -39,6 +39,7 @@ export default function ExpenseModal({
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const DESCRIPTION_MAX_LENGTH = 15;
   
   const amountInputRef = useRef<TextInput>(null);
   const descriptionInputRef = useRef<TextInput>(null);
@@ -65,8 +66,8 @@ export default function ExpenseModal({
   }, [visible, editingExpense]);
 
   const handleSubmit = async () => {
-    if (!amount.trim() || !description.trim()) {
-      Alert.alert('Error', 'Please fill in both amount and description');
+    if (!amount.trim()) {
+      Alert.alert('Error', 'Please fill in the amount');
       return;
     }
 
@@ -92,11 +93,7 @@ export default function ExpenseModal({
   };
 
   const handleDescriptionSubmit = () => {
-    if (amount.trim()) {
-      handleSubmit();
-    } else {
-      amountInputRef.current?.focus();
-    }
+    handleSubmit();
   };
 
   const handleBackdropPress = () => {
@@ -194,21 +191,33 @@ export default function ExpenseModal({
                       styles.input,
                       styles.descriptionInput,
                       {
-                        borderColor: colors.border,
-                        backgroundColor: colors.inputBackground,
+                        borderColor:
+                          description.length > DESCRIPTION_MAX_LENGTH ? 'red' : colors.border,
+                        backgroundColor: 'transparent',
                         color: colors.text,
+                        position: 'relative',
+                        zIndex: 1,
                       }
                     ]}
-                    placeholder="What did you spend on?"
+                    placeholder="What did you spend on? (optional)"
                     placeholderTextColor={colors.textSecondary}
                     value={description}
                     onChangeText={setDescription}
                     returnKeyType="done"
                     onSubmitEditing={handleDescriptionSubmit}
                     multiline
+                    blurOnSubmit={true}
                     textAlignVertical="top"
                     editable={!isSubmitting}
                   />
+                  <Text
+                    style={[
+                      styles.charCount,
+                      { color: description.length > DESCRIPTION_MAX_LENGTH ? 'red' : colors.textSecondary }
+                    ]}
+                  >
+                    {DESCRIPTION_MAX_LENGTH - description.length}
+                  </Text>
                 </View>
               </View>
 
@@ -359,5 +368,12 @@ const styles = StyleSheet.create({
   submitButtonText: {
     fontSize: 16,
     fontFamily: 'Inter-Bold',
+  },
+  charCount: {
+    fontSize: 12,
+    fontFamily: 'Inter-Regular',
+    marginTop: 2,
+    marginLeft: 4,
+    alignSelf: 'flex-end',
   },
 });

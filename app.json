@@ -19,7 +19,10 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.extr.expensetracker",
-      "buildNumber": "1"
+      "buildNumber": "1",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.extr.expensetracker",

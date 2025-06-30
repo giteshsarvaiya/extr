@@ -173,7 +173,7 @@ export default function HomeScreen() {
       setTimeout(() => {
         Animated.parallel([
           Animated.spring(toggleButtonTranslateY, {
-            toValue: -250,
+            toValue: -220,
             tension: 120,
             friction: 8,
             useNativeDriver: true,
@@ -1134,8 +1134,9 @@ const styles = StyleSheet.create({
     minHeight: 80,
   },
   expenseInfo: {
-    flex: 1,
-    justifyContent: 'center',
+    flexDirection: 'row-reverse',
+    justifyContent: 'space-between',
+    width:'50%'
   },
   expenseHeader: {
     flexDirection: 'row',
@@ -1149,7 +1150,7 @@ const styles = StyleSheet.create({
   expenseDescription: {
     fontSize: 14,
     fontFamily: 'Inter-Regular',
-    paddingRight: 12,
+    paddingHorizontal: 12,
   },
   expenseRightSection: {
     flexDirection:'row',
