@@ -9,7 +9,7 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/images/android-chrome-192x192.png",
+      "image": "./assets/images/ExTr-1024x1024-splash.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },

@@ -5,7 +5,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   Modal,
-  TextInput,
   Platform,
   Dimensions,
   TouchableWithoutFeedback,
@@ -13,41 +12,42 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useTheme } from '@/contexts/ThemeContext';
-import { TriangleAlert as AlertTriangle, X } from 'lucide-react-native';
+import { Trash2, X, AlertTriangle } from 'lucide-react-native';
 
 const { width } = Dimensions.get('window');
 
-interface ResetConfirmationModalProps {
+interface DeleteConfirmationModalProps {
   visible: boolean;
   onClose: () => void;
   onConfirm: () => void;
+  expenseAmount: number;
+  expenseDescription: string;
+  currencySymbol?: string;
 }
 
-export default function ResetConfirmationModal({
+export default function DeleteConfirmationModal({
   visible,
   onClose,
   onConfirm,
-}: ResetConfirmationModalProps) {
+  expenseAmount,
+  expenseDescription,
+  currencySymbol = '$',
+}: DeleteConfirmationModalProps) {
   const { colors, theme } = useTheme();
-  const [confirmationText, setConfirmationText] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // Reset form when modal opens
+  // Reset processing state when modal opens
   useEffect(() => {
     if (visible) {
-      setConfirmationText('');
       setIsProcessing(false);
     }
   }, [visible]);
 
   const handleConfirm = async () => {
-    if (confirmationText.toLowerCase() !== 'reset everything') {
-      return;
-    }
-
     setIsProcessing(true);
     try {
       await onConfirm();
+      onClose();
     } catch (error) {
       setIsProcessing(false);
     }
@@ -59,7 +59,13 @@ export default function ResetConfirmationModal({
     }
   };
 
-  const isConfirmationValid = confirmationText.toLowerCase() === 'reset everything';
+  // Format currency amount
+  const formatAmount = (amount: number): string => {
+    return `${currencySymbol}${amount.toLocaleString('en-US', { 
+      minimumFractionDigits: 2, 
+      maximumFractionDigits: 2 
+    })}`;
+  };
 
   return (
     <Modal
@@ -80,7 +86,6 @@ export default function ResetConfirmationModal({
           <View style={styles.backdropTouchable} />
         </TouchableWithoutFeedback>
 
-        {/* FIXED: Removed KeyboardAvoidingView to prevent layout flash */}
         <View style={styles.container}>
           <ScrollView 
             contentContainerStyle={styles.scrollContainer}
@@ -103,7 +108,7 @@ export default function ResetConfirmationModal({
                     <AlertTriangle size={24} color="#ef4444" />
                   </View>
                   <Text style={[styles.title, { color: colors.text }]}>
-                    Reset App Data
+                    Delete Expense
                   </Text>
                 </View>
                 <TouchableOpacity 
@@ -117,51 +122,30 @@ export default function ResetConfirmationModal({
 
               {/* Content */}
               <View style={styles.content}>
-                <Text style={[styles.warningText, { color: '#ef4444' }]}>
-                  ⚠️ This action cannot be undone
-                </Text>
-                
-                <Text style={[styles.description, { color: colors.textSecondary }]}>
-                  This will permanently delete:
-                </Text>
-                
-                <View style={styles.itemsList}>
-                  <Text style={[styles.listItem, { color: colors.textSecondary }]}>
-                    • All your expense records
-                  </Text>
-                  <Text style={[styles.listItem, { color: colors.textSecondary }]}>
-                    • All app settings and preferences
-                  </Text>
-                  <Text style={[styles.listItem, { color: colors.textSecondary }]}>
-                    • Currency and timezone settings
-                  </Text>
-                  <Text style={[styles.listItem, { color: colors.textSecondary }]}>
-                    • Theme preferences (reset to default)
+                {/* Expense Details Card */}
+                <View style={[styles.expenseCard, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                  <View style={styles.expenseHeader}>
+                    <Text style={[styles.expenseAmount, { color: colors.text }]}>
+                      {formatAmount(expenseAmount)}
+                    </Text>
+                    <View style={[styles.trashIcon, { backgroundColor: '#ef4444' + '10' }]}>
+                      <Trash2 size={20} color="#ef4444" />
+                    </View>
+                  </View>
+                  <Text style={[styles.expenseDescription, { color: colors.textSecondary }]}>
+                    {expenseDescription}
                   </Text>
                 </View>
 
-                <Text style={[styles.confirmationLabel, { color: colors.text }]}>
-                  To confirm, type <Text style={[styles.confirmationPhrase, { color: '#ef4444' }]}>reset everything</Text> below:
-                </Text>
-
-                <TextInput
-                  style={[
-                    styles.confirmationInput,
-                    {
-                      borderColor: isConfirmationValid ? '#ef4444' : colors.border,
-                      backgroundColor: colors.inputBackground,
-                      color: colors.text,
-                    }
-                  ]}
-                  placeholder="Type 'reset everything' to confirm"
-                  placeholderTextColor={colors.textSecondary}
-                  value={confirmationText}
-                  onChangeText={setConfirmationText}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  editable={!isProcessing}
-                  autoFocus
-                />
+                {/* Warning Message */}
+                <View style={styles.warningContainer}>
+                  <Text style={[styles.warningText, { color: '#ef4444' }]}>
+                    ⚠️ This action cannot be undone
+                  </Text>
+                  <Text style={[styles.warningSubtext, { color: colors.textSecondary }]}>
+                    This expense will be permanently removed from your records.
+                  </Text>
+                </View>
               </View>
 
               {/* Actions */}
@@ -170,12 +154,12 @@ export default function ResetConfirmationModal({
                   style={[
                     styles.button,
                     styles.cancelButton,
-                    { borderColor: colors.border }
+                    { borderColor: colors.primary }
                   ]}
                   onPress={onClose}
                   disabled={isProcessing}
                 >
-                  <Text style={[styles.cancelButtonText, { color: colors.textSecondary }]}>
+                  <Text style={[styles.cancelButtonText, { color: colors.text }]}>
                     Cancel
                   </Text>
                 </TouchableOpacity>
@@ -183,17 +167,15 @@ export default function ResetConfirmationModal({
                 <TouchableOpacity
                   style={[
                     styles.button,
-                    styles.resetButton,
-                    { 
-                      backgroundColor: isConfirmationValid ? '#ef4444' : colors.border,
-                      opacity: isConfirmationValid ? 1 : 0.5,
-                    }
+                    styles.deleteButton,
+                    { backgroundColor: '#ef4444' }
                   ]}
                   onPress={handleConfirm}
-                  disabled={!isConfirmationValid || isProcessing}
+                  disabled={isProcessing}
                 >
-                  <Text style={[styles.resetButtonText, { color: '#ffffff' }]}>
-                    {isProcessing ? 'Resetting...' : 'Reset Everything'}
+                  <Trash2 size={20} color="#ffffff" />
+                  <Text style={[styles.deleteButtonText, { color: '#ffffff' }]}>
+                    {isProcessing ? 'Deleting...' : 'Delete'}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -228,7 +210,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modal: {
-    width: Math.min(width - 40, 450),
+    width: Math.min(width - 40, 400),
     maxWidth: '100%',
     borderRadius: 24,
     shadowOffset: { width: 0, height: 20 },
@@ -270,45 +252,49 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 24,
-    gap: 16,
+    gap: 20,
+  },
+  expenseCard: {
+    padding: 20,
+    borderRadius: 16,
+    borderWidth: 1,
+  },
+  expenseHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  expenseAmount: {
+    fontSize: 24,
+    fontFamily: 'Inter-Bold',
+  },
+  trashIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  expenseDescription: {
+    fontSize: 16,
+    fontFamily: 'Inter-Regular',
+    lineHeight: 22,
+  },
+  warningContainer: {
+    alignItems: 'center',
+    gap: 8,
   },
   warningText: {
     fontSize: 16,
     fontFamily: 'Inter-Bold',
     textAlign: 'center',
-    marginBottom: 8,
   },
-  description: {
-    fontSize: 16,
-    fontFamily: 'Inter-Medium',
-    lineHeight: 22,
-  },
-  itemsList: {
-    gap: 8,
-    paddingLeft: 8,
-  },
-  listItem: {
+  warningSubtext: {
     fontSize: 14,
     fontFamily: 'Inter-Regular',
+    textAlign: 'center',
     lineHeight: 20,
-  },
-  confirmationLabel: {
-    fontSize: 16,
-    fontFamily: 'Inter-Medium',
-    lineHeight: 22,
-    marginTop: 8,
-  },
-  confirmationPhrase: {
-    fontFamily: 'Inter-Bold',
-  },
-  confirmationInput: {
-    height: 52,
-    borderWidth: 2,
-    borderRadius: 16,
-    paddingHorizontal: 16,
-    fontSize: 16,
-    fontFamily: 'Inter-Regular',
-    marginTop: 8,
   },
   actions: {
     flexDirection: 'row',
@@ -320,20 +306,22 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 52,
     borderRadius: 16,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 8,
   },
   cancelButton: {
     borderWidth: 1.5,
   },
-  resetButton: {
+  deleteButton: {
     // Background color set inline
   },
   cancelButtonText: {
     fontSize: 16,
     fontFamily: 'Inter-SemiBold',
   },
-  resetButtonText: {
+  deleteButtonText: {
     fontSize: 16,
     fontFamily: 'Inter-Bold',
   },

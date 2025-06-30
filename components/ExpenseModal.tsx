@@ -6,23 +6,17 @@ import {
   TouchableOpacity,
   Modal,
   TextInput,
-  KeyboardAvoidingView,
   Platform,
   Dimensions,
   TouchableWithoutFeedback,
   Alert,
+  ScrollView,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Plus, Check, X } from 'lucide-react-native';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withTiming,
-  Easing,
-} from 'react-native-reanimated';
 
-const { width, height } = Dimensions.get('window');
+const { width } = Dimensions.get('window');
 
 interface ExpenseModalProps {
   visible: boolean;
@@ -45,22 +39,13 @@ export default function ExpenseModal({
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [shouldAutoFocus, setShouldAutoFocus] = useState(false);
-  const [isAnimating, setIsAnimating] = useState(false);
   
   const amountInputRef = useRef<TextInput>(null);
   const descriptionInputRef = useRef<TextInput>(null);
 
-  // Animation values
-  const backdropOpacity = useSharedValue(0);
-  const modalScale = useSharedValue(0.9);
-  const modalOpacity = useSharedValue(0);
-  const modalTranslateY = useSharedValue(30);
-
-  // FIXED: Smoother modal opening/closing animations
+  // Reset form data when modal opens
   useEffect(() => {
     if (visible) {
-      // Reset form data
       if (editingExpense) {
         setAmount(editingExpense.amount.toString());
         setDescription(editingExpense.description);
@@ -68,74 +53,16 @@ export default function ExpenseModal({
         setAmount('');
         setDescription('');
       }
+      setIsSubmitting(false);
       
-      setIsAnimating(true);
+      // Auto focus after a short delay to ensure modal is fully rendered
+      const timer = setTimeout(() => {
+        amountInputRef.current?.focus();
+      }, 150);
       
-      // FIXED: Smooth opening animations with timing
-      backdropOpacity.value = withTiming(1, { 
-        duration: 250,
-        easing: Easing.out(Easing.quad)
-      });
-      
-      modalOpacity.value = withTiming(1, { 
-        duration: 250,
-        easing: Easing.out(Easing.quad)
-      });
-      
-      modalScale.value = withTiming(1, {
-        duration: 250,
-        easing: Easing.out(Easing.quad),
-      });
-
-      modalTranslateY.value = withTiming(0, {
-        duration: 250,
-        easing: Easing.out(Easing.quad),
-      });
-      
-      // Enable auto focus after animation
-      setTimeout(() => {
-        setShouldAutoFocus(true);
-        setIsAnimating(false);
-      }, 280);
-    } else {
-      setIsAnimating(true);
-      
-      // FIXED: Smooth closing animations
-      backdropOpacity.value = withTiming(0, { 
-        duration: 200,
-        easing: Easing.in(Easing.quad)
-      });
-      
-      modalOpacity.value = withTiming(0, { 
-        duration: 200,
-        easing: Easing.in(Easing.quad)
-      });
-      
-      modalScale.value = withTiming(0.9, { 
-        duration: 200,
-        easing: Easing.in(Easing.quad)
-      });
-
-      modalTranslateY.value = withTiming(30, { 
-        duration: 200,
-        easing: Easing.in(Easing.quad)
-      });
-      
-      // Reset states
-      setTimeout(() => {
-        setShouldAutoFocus(false);
-        setIsSubmitting(false);
-        setIsAnimating(false);
-      }, 200);
+      return () => clearTimeout(timer);
     }
   }, [visible, editingExpense]);
-
-  // Handle auto focus separately
-  useEffect(() => {
-    if (shouldAutoFocus && visible && !isAnimating) {
-      amountInputRef.current?.focus();
-    }
-  }, [shouldAutoFocus, visible, isAnimating]);
 
   const handleSubmit = async () => {
     if (!amount.trim() || !description.trim()) {
@@ -173,39 +100,18 @@ export default function ExpenseModal({
   };
 
   const handleBackdropPress = () => {
-    if (!isSubmitting && !isAnimating) {
+    if (!isSubmitting) {
       onClose();
     }
   };
 
-  const backdropStyle = useAnimatedStyle(() => ({
-    opacity: backdropOpacity.value,
-  }));
-
-  const modalStyle = useAnimatedStyle(() => ({
-    opacity: modalOpacity.value,
-    transform: [
-      { scale: modalScale.value },
-      { translateY: modalTranslateY.value }
-    ],
-  }));
-
-  // CRITICAL FIX: Don't render the modal at all when not visible to prevent layout shifts
-  if (!visible && !isAnimating) {
-    return null;
-  }
-
   return (
     <Modal
-      visible={visible || isAnimating}
+      visible={visible}
       transparent
-      animationType="none"
+      animationType="fade"
       onRequestClose={onClose}
-      statusBarTranslucent={Platform.OS === 'android'}
-      // CRITICAL FIX: Use overFullScreen to prevent layout interference
-      presentationStyle="overFullScreen"
-      // CRITICAL FIX: Prevent modal from affecting layout
-      supportedOrientations={['portrait']}
+      statusBarTranslucent={false}
     >
       <StatusBar 
         style={theme === 'dark' ? 'light' : 'dark'} 
@@ -213,26 +119,25 @@ export default function ExpenseModal({
         translucent={false}
       />
       
-      {/* CRITICAL FIX: Container that doesn't interfere with main content */}
-      <View style={styles.modalContainer}>
-        <Animated.View style={[styles.backdrop, backdropStyle]}>
-          <TouchableWithoutFeedback onPress={handleBackdropPress}>
-            <View style={styles.backdropTouchable} />
-          </TouchableWithoutFeedback>
+      <View style={styles.backdrop}>
+        <TouchableWithoutFeedback onPress={handleBackdropPress}>
+          <View style={styles.backdropTouchable} />
+        </TouchableWithoutFeedback>
 
-          <KeyboardAvoidingView 
-            style={styles.container}
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+        {/* FIXED: Removed KeyboardAvoidingView to prevent layout flash */}
+        <View style={styles.container}>
+          <ScrollView 
+            contentContainerStyle={styles.scrollContainer}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
           >
-            <Animated.View 
+            <View 
               style={[
                 styles.modal,
                 { 
                   backgroundColor: colors.surface,
                   shadowColor: colors.shadowColor,
-                },
-                modalStyle
+                }
               ]}
             >
               {/* Header */}
@@ -342,27 +247,15 @@ export default function ExpenseModal({
                   </Text>
                 </TouchableOpacity>
               </View>
-            </Animated.View>
-          </KeyboardAvoidingView>
-        </Animated.View>
+            </View>
+          </ScrollView>
+        </View>
       </View>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  // CRITICAL FIX: Modal container that doesn't affect layout
-  modalContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    width: '100%',
-    height: '100%',
-    // CRITICAL FIX: Ensure modal doesn't interfere with main content
-    zIndex: 9999,
-  },
   backdrop: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
@@ -373,12 +266,16 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
   },
   container: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingVertical: 40,
-    // FIXED: Position modal higher from center
-    marginTop: -20, // This moves the modal up by 20px from center
+  },
+  scrollContainer: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   modal: {
     width: Math.min(width - 40, 400),

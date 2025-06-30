@@ -19,21 +19,15 @@ import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, end
 import Sidebar from '@/components/Sidebar';
 import HeaderBrand from '@/components/HeaderBrand';
 import ExpenseModal from '@/components/ExpenseModal';
+import DeleteConfirmationModal from '@/components/DeleteConfirmationModal';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { CurrencyFormatter } from '@/utils/formatCurrency';
 import { Platform } from 'react-native';
-import { GestureDetector, Gesture } from 'react-native-gesture-handler';
-import { runOnJS } from 'react-native-reanimated';
 
 type ViewMode = 'daily' | 'weekly' | 'monthly';
 
-const { height: screenHeight, width: screenWidth } = Dimensions.get('window');
-
-// Swipe gesture constants
-const SWIPE_THRESHOLD = 50; // Minimum distance to trigger swipe
-const SWIPE_VELOCITY_THRESHOLD = 300; // Minimum velocity to trigger swipe
-const EDGE_SWIPE_AREA = 50; // Area from left edge where swipe to open is detected
+const { height: screenHeight } = Dimensions.get('window');
 
 export default function HomeScreen() {
   const { colors, theme } = useTheme();
@@ -56,6 +50,14 @@ export default function HomeScreen() {
     description: string;
   } | null>(null);
 
+  // Delete modal state
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deletingExpense, setDeletingExpense] = useState<{
+    id: string;
+    amount: number;
+    description: string;
+  } | null>(null);
+
   const scrollY = useRef(new Animated.Value(0)).current;
   
   // Main amount display animation values
@@ -65,11 +67,11 @@ export default function HomeScreen() {
 
   // FIXED: Sticky header animation values - start completely hidden and stay hidden
   const stickyHeaderOpacity = useRef(new Animated.Value(0)).current;
-  const stickyHeaderScale = useRef(new Animated.Value(0.9)).current;
-  const stickyHeaderTranslateY = useRef(new Animated.Value(-50)).current;
+  const stickyHeaderScale = useRef(new Animated.Value(0.8)).current;
+  const stickyHeaderTranslateY = useRef(new Animated.Value(-100)).current;
 
-  // FIXED: Details content animation - now slides from bottom instead of covering entire screen
-  const detailsTranslateY = useRef(new Animated.Value(screenHeight * 0.6)).current;
+  // Details content animation
+  const detailsTranslateY = useRef(new Animated.Value(screenHeight)).current;
   const detailsOpacity = useRef(new Animated.Value(0)).current;
 
   // Toggle button animation
@@ -105,7 +107,7 @@ export default function HomeScreen() {
     }
   }, [settingsLoading, userSettings, router]);
 
-  // FIXED: Animate details when showDetails changes - keep navigation accessible
+  // FIXED: Animate details when showDetails changes - eliminate flash completely
   useEffect(() => {
     if (showDetails) {
       // Phase 1: Hide main amount display quickly
@@ -149,9 +151,9 @@ export default function HomeScreen() {
             useNativeDriver: true,
           }),
         ]).start();
-      }, 200);
+      }, 300); // Increased delay to prevent any flash
 
-      // Phase 3: Animate details content up from bottom (partial height)
+      // Phase 3: Animate details content up
       setTimeout(() => {
         Animated.parallel([
           Animated.timing(detailsTranslateY, {
@@ -171,7 +173,7 @@ export default function HomeScreen() {
       setTimeout(() => {
         Animated.parallel([
           Animated.spring(toggleButtonTranslateY, {
-            toValue: -180,
+            toValue: -250,
             tension: 120,
             friction: 8,
             useNativeDriver: true,
@@ -187,9 +189,10 @@ export default function HomeScreen() {
 
     } else {
       // FIXED: Immediately hide sticky header without any flash
+      // Set values instantly to prevent any visual appearance
       stickyHeaderOpacity.setValue(0);
-      stickyHeaderScale.setValue(0.9);
-      stickyHeaderTranslateY.setValue(-50);
+      stickyHeaderScale.setValue(0.8);
+      stickyHeaderTranslateY.setValue(-100);
 
       // Phase 1: Animate toggle button down to original position
       Animated.parallel([
@@ -207,10 +210,10 @@ export default function HomeScreen() {
         }),
       ]).start();
 
-      // Phase 2: Hide details content (slide down to partial height)
+      // Phase 2: Hide details content
       Animated.parallel([
         Animated.timing(detailsTranslateY, {
-          toValue: screenHeight * 0.6,
+          toValue: screenHeight,
           duration: 400,
           useNativeDriver: true,
         }),
@@ -405,15 +408,26 @@ export default function HomeScreen() {
     }
   };
 
-  const handleDeleteExpense = (expenseId: string) => {
-    Alert.alert(
-      'Delete Expense',
-      'Are you sure you want to delete this expense?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Delete', style: 'destructive', onPress: () => deleteExpense(expenseId) },
-      ]
-    );
+  // UPDATED: Delete handlers with confirmation modal
+  const handleDeleteExpense = (expense: any) => {
+    setDeletingExpense({
+      id: expense.id,
+      amount: expense.amount,
+      description: expense.description,
+    });
+    setShowDeleteModal(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (deletingExpense) {
+      try {
+        await deleteExpense(deletingExpense.id);
+        setDeletingExpense(null);
+      } catch (error) {
+        console.error('Error deleting expense:', error);
+        Alert.alert('Error', 'Failed to delete expense');
+      }
+    }
   };
 
   // FIXED: Web-compatible date picker handling with future date prevention
@@ -461,49 +475,6 @@ export default function HomeScreen() {
       setShowDatePicker(false);
     }
   };
-
-  // NEW: Swipe gesture handlers
-  const openSidebar = () => {
-    setShowSidebar(true);
-  };
-
-  const closeSidebar = () => {
-    setShowSidebar(false);
-  };
-
-  // NEW: Create swipe gesture
-  const swipeGesture = Gesture.Pan()
-    .onStart((event) => {
-      // Only handle gestures that start from the left edge for opening
-      // or anywhere when sidebar is open for closing
-      if (!showSidebar && event.x > EDGE_SWIPE_AREA) {
-        return;
-      }
-    })
-    .onEnd((event) => {
-      const { translationX, velocityX, x } = event;
-      
-      if (!showSidebar) {
-        // Sidebar is closed - check for right swipe to open
-        const shouldOpen = 
-          (translationX > SWIPE_THRESHOLD && x < EDGE_SWIPE_AREA) || 
-          (velocityX > SWIPE_VELOCITY_THRESHOLD && x < EDGE_SWIPE_AREA);
-        
-        if (shouldOpen) {
-          runOnJS(openSidebar)();
-        }
-      } else {
-        // Sidebar is open - check for left swipe to close
-        const shouldClose = 
-          translationX < -SWIPE_THRESHOLD || 
-          velocityX < -SWIPE_VELOCITY_THRESHOLD;
-        
-        if (shouldClose) {
-          runOnJS(closeSidebar)();
-        }
-      }
-    })
-    .runOnJS(true);
 
   const filteredExpenses = expenses.filter(expense => {
     const expenseDate = new Date(expense.created_at);
@@ -577,302 +548,318 @@ export default function HomeScreen() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <SafeAreaView style={styles.safeContainer}>
         {/* FIXED: Main content container that won't be affected by sidebar */}
-        <GestureDetector gesture={swipeGesture}>
-          <View style={styles.mainContent}>
-            {/* Header */}
-            <View style={[styles.header, { paddingTop: Math.max(insets.top, 20) }]}>
-              <HeaderBrand
-                isOpen={showSidebar}
-                onPress={() => setShowSidebar(true)}
-              />
-            </View>
-
-            {/* FIXED: Navigation section that stays accessible */}
-            <View style={styles.navigationSection}>
-              {/* Date Selector with Navigation */}
-              <View style={styles.dateNavigationContainer}>
-                <TouchableOpacity 
-                  style={styles.navButton}
-                  onPress={() => navigatePeriod('prev')}
-                  activeOpacity={0.7}
-                >
-                  <ChevronLeft size={20} color={colors.text} />
-                </TouchableOpacity>
-                
-                <TouchableOpacity 
-                  style={styles.dateSelector}
-                  onPress={handleDatePickerPress}
-                  activeOpacity={0.7}
-                >
-                  <Calendar size={20} color={colors.text} />
-                  <Text style={[styles.dateText, { color: colors.text }]}>{getPeriodLabel()}</Text>
-                  <ChevronDown size={20} color={colors.text} />
-                </TouchableOpacity>
-                
-                <TouchableOpacity 
-                  style={[
-                    styles.navButton,
-                    isNextDisabled() && styles.navButtonDisabled
-                  ]}
-                  onPress={() => navigatePeriod('next')}
-                  activeOpacity={isNextDisabled() ? 1 : 0.7}
-                  disabled={isNextDisabled()}
-                >
-                  <ChevronRight 
-                    size={20} 
-                    color={isNextDisabled() ? colors.textSecondary + '50' : colors.text} 
-                  />
-                </TouchableOpacity>
-              </View>
-
-              {/* Divider between date header and tabs */}
-              <View style={[styles.divider, { backgroundColor: colors.border }]} />
-
-              {/* Tabs - Weekly, Daily, Monthly */}
-              <View style={styles.tabsContainer}>
-                <TouchableOpacity
-                  style={[
-                    styles.tab,
-                    viewMode === 'weekly' && { borderBottomColor: colors.primary, borderBottomWidth: 2 }
-                  ]}
-                  onPress={() => setViewMode('weekly')}
-                  activeOpacity={0.7}
-                >
-                  <Text
-                    style={[
-                      styles.tabText,
-                      { color: viewMode === 'weekly' ? colors.primary : colors.textSecondary }
-                    ]}
-                  >
-                    Weekly
-                  </Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity
-                  style={[
-                    styles.tab,
-                    viewMode === 'daily' && { borderBottomColor: colors.primary, borderBottomWidth: 2 }
-                  ]}
-                  onPress={() => setViewMode('daily')}
-                  activeOpacity={0.7}
-                >
-                  <Text
-                    style={[
-                      styles.tabText,
-                      { color: viewMode === 'daily' ? colors.primary : colors.textSecondary }
-                    ]}
-                  >
-                    Daily
-                  </Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity
-                  style={[
-                    styles.tab,
-                    viewMode === 'monthly' && { borderBottomColor: colors.primary, borderBottomWidth: 2 }
-                  ]}
-                  onPress={() => setViewMode('monthly')}
-                  activeOpacity={0.7}
-                >
-                  <Text
-                    style={[
-                      styles.tabText,
-                      { color: viewMode === 'monthly' ? colors.primary : colors.textSecondary }
-                    ]}
-                  >
-                    Monthly
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            {/* FIXED: Sticky Header - completely hidden when not in use and no flash */}
-            {showDetails && (
-              <Animated.View 
-                style={[
-                  styles.fixedStickyHeader,
-                  { 
-                    backgroundColor: colors.background,
-                    borderBottomColor: colors.border,
-                    opacity: stickyHeaderOpacity,
-                    transform: [
-                      { scale: stickyHeaderScale },
-                      { translateY: stickyHeaderTranslateY }
-                    ]
-                  }
-                ]}
-                pointerEvents={showDetails ? 'auto' : 'none'}
-              >
-                <View style={styles.stickyContent}>
-                  <View style={[styles.amountBackground, { backgroundColor: colors.primary }]}>
-                    <Text style={[styles.stickyAmount, { color: colors.background }]}>
-                      {formatCurrency(currentTotal)}
-                    </Text>
-                  </View>
-                </View>
-              </Animated.View>
-            )}
-
-            <View style={styles.content}>
-              {/* Main Amount Display - Always rendered but animated */}
-              <Animated.View 
-                style={[
-                  styles.amountContainer,
-                  {
-                    transform: [
-                      { translateY: mainAmountTranslateY },
-                      { scale: mainAmountScale }
-                    ],
-                    opacity: mainAmountOpacity,
-                  }
-                ]}
-              >
-                <Text style={[styles.mainAmount, { color: colors.text }]}>
-                  {formatCurrency(currentTotal)}
-                </Text>
-                <Text style={[styles.comparison, { color: colors.textSecondary }]}>
-                  vs. yesterday {formatCurrencyDetailed(yesterdayTotal)}
-                </Text>
-              </Animated.View>
-
-              {/* Animated Toggle Button */}
-              <Animated.View
-                style={[
-                  styles.toggleButtonContainer,
-                  {
-                    transform: [
-                      { translateY: toggleButtonTranslateY },
-                      { scale: toggleButtonScale }
-                    ],
-                    opacity: toggleButtonOpacity,
-                  }
-                ]}
-              >
-                <TouchableOpacity 
-                  style={[styles.toggleButton, { backgroundColor: colors.cardBackground, shadowColor: colors.shadowColor }]}
-                  onPress={() => setShowDetails(!showDetails)}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[styles.toggleButtonText, { color: colors.textSecondary }]}>
-                    {showDetails ? 'hide details' : 'show details'}
-                  </Text>
-                  {showDetails ? (
-                    <ChevronUp size={12} color={colors.textSecondary} />
-                  ) : (
-                    <ChevronDown size={12} color={colors.textSecondary} />
-                  )}
-                </TouchableOpacity>
-              </Animated.View>
-
-              {/* FIXED: Details Content - now positioned to not cover navigation */}
-              <Animated.View
-                style={[
-                  styles.detailsContainer,
-                  {
-                    transform: [{ translateY: detailsTranslateY }],
-                    opacity: detailsOpacity,
-                  }
-                ]}
-                pointerEvents={showDetails ? 'auto' : 'none'}
-              >
-                <Animated.ScrollView
-                  style={styles.detailsScrollView}
-                  onScroll={Animated.event(
-                    [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-                    { useNativeDriver: false }
-                  )}
-                  scrollEventThrottle={16}
-                  showsVerticalScrollIndicator={false}
-                  contentContainerStyle={{
-                    paddingBottom: 40 + insets.bottom,
-                    paddingTop: 20, // Reduced padding since navigation is now accessible
-                  }}
-                >
-                  {/* Expense List with Date Headers */}
-                  <View style={styles.expenseList}>
-                    {groupedExpenses().map((group, groupIndex) => (
-                      <View key={groupIndex}>
-                        {renderDateHeader(group.date)}
-                        {group.expenses.map((expense) => (
-                          <View key={expense.id} style={[styles.expenseItem, { borderBottomColor: colors.border }]}>
-                            <View style={styles.expenseInfo}>
-                              <View style={styles.expenseHeader}>
-                                <Text style={[styles.expenseAmount, { color: colors.text }]}>
-                                  {formatCurrencyCompact(expense.amount)}
-                                </Text>
-                              </View>
-                              <Text style={[styles.expenseDescription, { color: colors.textSecondary }]}>
-                                {expense.description}
-                              </Text>
-                            </View>
-                            <View style={styles.expenseRightSection}>
-                              <Text style={[styles.expenseTime, { color: colors.textSecondary }]}>
-                                {format(new Date(expense.created_at), 'h:mm a')}
-                              </Text>
-                              <View style={styles.expenseActions}>
-                                <TouchableOpacity 
-                                  style={[styles.actionButton, styles.editButton, { backgroundColor: colors.primary + '15' }]}
-                                  onPress={() => handleEditExpense(expense)}
-                                  activeOpacity={0.7}
-                                >
-                                  <Edit size={16} color={colors.primary} />
-                                </TouchableOpacity>
-                                <TouchableOpacity 
-                                  style={[styles.actionButton, styles.deleteButton, { backgroundColor: colors.error + '15' }]}
-                                  onPress={() => handleDeleteExpense(expense.id)}
-                                  activeOpacity={0.7}
-                                >
-                                  <Trash2 size={16} color={colors.error} />
-                                </TouchableOpacity>
-                              </View>
-                            </View>
-                          </View>
-                        ))}
-                      </View>
-                    ))}
-                  </View>
-                </Animated.ScrollView>
-              </Animated.View>
-            </View>
-
-            {/* FIXED: Floating Add Button - Positioned higher from bottom */}
-            {viewMode === 'daily' && (
-              <TouchableOpacity
-                style={[
-                  styles.floatingAddButton, 
-                  { 
-                    backgroundColor: colors.primary, 
-                    shadowColor: colors.shadowColor,
-                    bottom: 50 + insets.bottom,
-                  }
-                ]}
-                onPress={handleAddExpense}
-                activeOpacity={0.8}
-              >
-                <Plus size={24} color={colors.background} />
-              </TouchableOpacity>
-            )}
-
-            {/* Date Picker - Only show on mobile platforms with future date prevention */}
-            {showDatePicker && Platform.OS !== 'web' && (
-              <DateTimePicker
-                value={selectedDate}
-                mode="date"
-                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                onChange={handleDateChange}
-                maximumDate={new Date()} // FIXED: Prevent future date selection
-              />
-            )}
-
-            {/* Expense Modal */}
-            <ExpenseModal
-              visible={showExpenseModal}
-              onClose={() => setShowExpenseModal(false)}
-              onSubmit={handleExpenseSubmit}
-              editingExpense={editingExpense}
+        <View style={styles.mainContent}>
+          {/* FIXED: Header - Always accessible with proper z-index */}
+          <View style={[styles.header, { paddingTop: Math.max(insets.top, 20), zIndex: 1000 }]}>
+            <HeaderBrand
+              isOpen={showSidebar}
+              onPress={() => setShowSidebar(true)}
             />
           </View>
-        </GestureDetector>
+
+          {/* FIXED: Date Selector with Navigation - Always accessible */}
+          <View style={[styles.dateNavigationContainer, { zIndex: 999 }]}>
+            <TouchableOpacity 
+              style={styles.navButton}
+              onPress={() => navigatePeriod('prev')}
+              activeOpacity={0.7}
+            >
+              <ChevronLeft size={20} color={colors.text} />
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.dateSelector}
+              onPress={handleDatePickerPress}
+              activeOpacity={0.7}
+            >
+              <Calendar size={20} color={colors.text} />
+              <Text style={[styles.dateText, { color: colors.text }]}>{getPeriodLabel()}</Text>
+              <ChevronDown size={20} color={colors.text} />
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={[
+                styles.navButton,
+                isNextDisabled() && styles.navButtonDisabled
+              ]}
+              onPress={() => navigatePeriod('next')}
+              activeOpacity={isNextDisabled() ? 1 : 0.7}
+              disabled={isNextDisabled()}
+            >
+              <ChevronRight 
+                size={20} 
+                color={isNextDisabled() ? colors.textSecondary + '50' : colors.text} 
+              />
+            </TouchableOpacity>
+          </View>
+
+          {/* FIXED: Divider between date header and tabs - Always accessible */}
+          <View style={[styles.divider, { backgroundColor: colors.border, zIndex: 998 }]} />
+
+          {/* FIXED: Tabs - Always accessible with proper z-index */}
+          <View style={[styles.tabsContainer, { zIndex: 997 }]}>
+            <TouchableOpacity
+              style={[
+                styles.tab,
+                viewMode === 'weekly' && { borderBottomColor: colors.primary, borderBottomWidth: 2 }
+              ]}
+              onPress={() => setViewMode('weekly')}
+              activeOpacity={0.7}
+            >
+              <Text
+                style={[
+                  styles.tabText,
+                  { color: viewMode === 'weekly' ? colors.primary : colors.textSecondary }
+                ]}
+              >
+                Weekly
+              </Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={[
+                styles.tab,
+                viewMode === 'daily' && { borderBottomColor: colors.primary, borderBottomWidth: 2 }
+              ]}
+              onPress={() => setViewMode('daily')}
+              activeOpacity={0.7}
+            >
+              <Text
+                style={[
+                  styles.tabText,
+                  { color: viewMode === 'daily' ? colors.primary : colors.textSecondary }
+                ]}
+              >
+                Daily
+              </Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={[
+                styles.tab,
+                viewMode === 'monthly' && { borderBottomColor: colors.primary, borderBottomWidth: 2 }
+              ]}
+              onPress={() => setViewMode('monthly')}
+              activeOpacity={0.7}
+            >
+              <Text
+                style={[
+                  styles.tabText,
+                  { color: viewMode === 'monthly' ? colors.primary : colors.textSecondary }
+                ]}
+              >
+                Monthly
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* FIXED: Sticky Header - positioned below tabs with proper z-index */}
+          {showDetails && (
+            <Animated.View 
+              style={[
+                styles.fixedStickyHeader,
+                { 
+                  backgroundColor: colors.background,
+                  borderBottomColor: colors.border,
+                  opacity: stickyHeaderOpacity,
+                  zIndex: 990, // FIXED: Lower z-index to stay below toggle button
+                  transform: [
+                    { scale: stickyHeaderScale },
+                    { translateY: stickyHeaderTranslateY }
+                  ]
+                }
+              ]}
+              pointerEvents={showDetails ? 'auto' : 'none'}
+            >
+              <View style={styles.stickyContent}>
+                <View style={[styles.amountBackground, { backgroundColor: colors.primary }]}>
+                  <Text style={[styles.stickyAmount, { color: colors.background }]}>
+                    {formatCurrency(currentTotal)}
+                  </Text>
+                  <Text style={[styles.comparison, { color: colors.background }]}>
+                    vs. yesterday {formatCurrencyDetailed(yesterdayTotal)}
+                  </Text>
+                </View>
+              </View>
+            </Animated.View>
+          )}
+
+          {/* FIXED: Content area with proper positioning */}
+          <View style={[styles.content, { zIndex: 1 }]}>
+            {/* Main Amount Display - Always rendered but animated */}
+            <Animated.View 
+              style={[
+                styles.amountContainer,
+                {
+                  transform: [
+                    { translateY: mainAmountTranslateY },
+                    { scale: mainAmountScale }
+                  ],
+                  opacity: mainAmountOpacity,
+                }
+              ]}
+            >
+              <Text style={[styles.mainAmount, { color: colors.text }]}>
+                {formatCurrency(currentTotal)}
+              </Text>
+              <Text style={[styles.comparison, { color: colors.textSecondary }]}>
+                vs. yesterday {formatCurrencyDetailed(yesterdayTotal)}
+              </Text>
+            </Animated.View>
+
+            {/* FIXED: Animated Toggle Button - Highest z-index to stay above everything */}
+            <Animated.View
+              style={[
+                styles.toggleButtonContainer,
+                {
+                  transform: [
+                    { translateY: toggleButtonTranslateY },
+                    { scale: toggleButtonScale }
+                  ],
+                  opacity: toggleButtonOpacity,
+                  zIndex: 9999, // FIXED: Maximum z-index to stay above sticky header
+                }
+              ]}
+            >
+              <TouchableOpacity 
+                style={[styles.toggleButton, { backgroundColor: colors.cardBackground, shadowColor: colors.shadowColor }]}
+                onPress={() => setShowDetails(!showDetails)}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.toggleButtonText, { color: colors.textSecondary }]}>
+                  {showDetails ? 'hide details' : 'show details'}
+                </Text>
+                {showDetails ? (
+                  <ChevronUp size={12} color={colors.textSecondary} />
+                ) : (
+                  <ChevronDown size={12} color={colors.textSecondary} />
+                )}
+              </TouchableOpacity>
+            </Animated.View>
+
+            {/* FIXED: Animated Details Content - positioned to not interfere with header */}
+            <Animated.View
+              style={[
+                styles.detailsContainer,
+                {
+                  transform: [{ translateY: detailsTranslateY }],
+                  opacity: detailsOpacity,
+                  zIndex: 1, // Below header elements
+                }
+              ]}
+              pointerEvents={showDetails ? 'auto' : 'none'}
+            >
+              <Animated.ScrollView
+                style={styles.detailsScrollView}
+                onScroll={Animated.event(
+                  [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+                  { useNativeDriver: false }
+                )}
+                scrollEventThrottle={16}
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={{
+                  paddingBottom: 40 + insets.bottom,
+                  paddingTop: 80, // Extra padding to account for the toggle button
+                }}
+              >
+                {/* Expense List with Date Headers */}
+                <View style={styles.expenseList}>
+                  {groupedExpenses().map((group, groupIndex) => (
+                    <View key={groupIndex}>
+                      {renderDateHeader(group.date)}
+                      {group.expenses.map((expense) => (
+                        <View key={expense.id} style={[styles.expenseItem, { borderBottomColor: colors.border }]}>
+                          <View style={styles.expenseInfo}>
+                            <View style={styles.expenseHeader}>
+                              <Text style={[styles.expenseAmount, { color: colors.text }]}>
+                                {formatCurrencyCompact(expense.amount)}
+                              </Text>
+                            </View>
+                            <Text style={[styles.expenseDescription, { color: colors.textSecondary }]}>
+                              {expense.description}
+                            </Text>
+                          </View>
+                          <View style={styles.expenseRightSection}>
+                            <Text style={[styles.expenseTime, { color: colors.textSecondary }]}>
+                              {format(new Date(expense.created_at), 'h:mm a')}
+                            </Text>
+                            <View style={styles.expenseActions}>
+                              <TouchableOpacity 
+                                style={[styles.actionButton, styles.editButton, { backgroundColor: colors.primary + '15' }]}
+                                onPress={() => handleEditExpense(expense)}
+                                activeOpacity={0.7}
+                              >
+                                <Edit size={16} color={colors.primary} />
+                              </TouchableOpacity>
+                              <TouchableOpacity 
+                                style={[styles.actionButton, styles.deleteButton, { backgroundColor: colors.error + '15' }]}
+                                onPress={() => handleDeleteExpense(expense)}
+                                activeOpacity={0.7}
+                              >
+                                <Trash2 size={16} color={colors.error} />
+                              </TouchableOpacity>
+                            </View>
+                          </View>
+                        </View>
+                      ))}
+                    </View>
+                  ))}
+                </View>
+              </Animated.ScrollView>
+            </Animated.View>
+          </View>
+
+          {/* FIXED: Floating Add Button - Positioned higher from bottom with high z-index */}
+          {viewMode === 'daily' && (
+            <TouchableOpacity
+              style={[
+                styles.floatingAddButton, 
+                { 
+                  backgroundColor: colors.primary, 
+                  shadowColor: colors.shadowColor,
+                  bottom: 50 + insets.bottom,
+                  zIndex: 1000, // Highest z-index to stay above everything
+                }
+              ]}
+              onPress={handleAddExpense}
+              activeOpacity={0.8}
+            >
+              <Plus size={24} color={colors.background} />
+            </TouchableOpacity>
+          )}
+
+          {/* Date Picker - Only show on mobile platforms with future date prevention */}
+          {showDatePicker && Platform.OS !== 'web' && (
+            <DateTimePicker
+              value={selectedDate}
+              mode="date"
+              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+              onChange={handleDateChange}
+              maximumDate={new Date()} // FIXED: Prevent future date selection
+            />
+          )}
+
+          {/* Expense Modal */}
+          <ExpenseModal
+            visible={showExpenseModal}
+            onClose={() => setShowExpenseModal(false)}
+            onSubmit={handleExpenseSubmit}
+            editingExpense={editingExpense}
+          />
+
+          {/* Delete Confirmation Modal */}
+          <DeleteConfirmationModal
+            visible={showDeleteModal}
+            onClose={() => {
+              setShowDeleteModal(false);
+              setDeletingExpense(null);
+            }}
+            onConfirm={handleConfirmDelete}
+            expenseAmount={deletingExpense?.amount || 0}
+            expenseDescription={deletingExpense?.description || ''}
+            currencySymbol={userSettings?.currencySymbol || '$'}
+          />
+        </View>
 
         {/* FIXED: Sidebar rendered outside main content to prevent layout shifts */}
         <Sidebar
@@ -911,13 +898,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingVertical: 6,
-    paddingBottom: 10,
-  },
-  // FIXED: Navigation section that stays accessible
-  navigationSection: {
+    paddingVertical: 16,
+    paddingBottom: 16,
     backgroundColor: 'transparent',
-    zIndex: 10, // Ensure it stays above details content
+    position: 'relative',
   },
   dateNavigationContainer: {
     flexDirection: 'row',
@@ -953,11 +937,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: 'Inter-Medium',
   },
-  // Divider styles
+  // FIXED: Divider styles with z-index
   divider: {
     height: 1,
     marginHorizontal: 20,
     marginVertical: 8,
+    position: 'relative',
   },
   tabsContainer: {
     flexDirection: 'row',
@@ -991,13 +976,17 @@ const styles = StyleSheet.create({
     minHeight: 60,
   },
   amountBackground: {
+    flexDirection: 'column',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 10,
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 20,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
-    elevation: 4,
+    elevation: 20,
   },
   stickyAmount: {
     fontSize: 28,
@@ -1006,9 +995,13 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+    position: 'relative',
   },
   amountContainer: {
+    flexDirection: 'column',
+    justifyContent: 'center',
     alignItems: 'center',
+    gap: 24,
     paddingVertical: 60,
   },
   mainAmount: {
@@ -1037,21 +1030,19 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.12,
     shadowRadius: 8,
-    elevation: 6,
+    elevation: 20, // FIXED: Higher elevation to stay above sticky header
   },
   toggleButtonText: {
     fontSize: 11,
     fontFamily: 'Inter-Medium',
     letterSpacing: 0.2,
   },
-  // FIXED: Details container positioned to not cover navigation
   detailsContainer: {
     position: 'absolute',
-    top: 120, // Start below the navigation section
+    top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'transparent',
   },
   detailsScrollView: {
     flex: 1,
