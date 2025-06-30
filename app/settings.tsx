@@ -7,6 +7,7 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
+  Modal,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
@@ -22,7 +23,8 @@ import {
   Sun,
   ArrowLeft,
   Settings as SettingsIcon,
-  RotateCcw
+  RotateCcw,
+  Smartphone
 } from 'lucide-react-native';
 import CustomModal from '@/components/CustomModal';
 import TimezoneSelector from '@/components/TimezoneSelector';
@@ -47,6 +49,7 @@ export default function SettingsScreen() {
   const [showTimezoneModal, setShowTimezoneModal] = useState(false);
   const [showCurrencyModal, setShowCurrencyModal] = useState(false);
   const [showResetModal, setShowResetModal] = useState(false);
+  const [showWidgetModal, setShowWidgetModal] = useState(false);
 
   const handleThemeSelect = (selectedVariant: string) => {
     changeTheme(selectedVariant as any);
@@ -148,6 +151,53 @@ export default function SettingsScreen() {
     </TouchableOpacity>
   );
 
+  // Modal styles using theme colors
+  const themedModalStyles = {
+    backdrop: {
+      flex: 1,
+      backgroundColor: theme === 'dark' ? 'rgba(0,0,0,0.7)' : 'rgba(0,0,0,0.3)',
+      alignItems: 'center' as const,
+      justifyContent: 'center' as const,
+    },
+    modalContainer: {
+      backgroundColor: colors.cardBackground,
+      borderRadius: 12,
+      padding: 32,
+      alignItems: 'center' as const,
+      shadowColor: colors.shadowColor,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.2,
+      shadowRadius: 8,
+      elevation: 5,
+      minWidth: 260,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    title: {
+      fontSize: 20,
+      fontWeight: '700' as const,
+      marginBottom: 12,
+      color: colors.text,
+    },
+    message: {
+      fontSize: 16,
+      color: colors.textSecondary,
+      marginBottom: 24,
+      textAlign: 'center' as const,
+    },
+    button: {
+      backgroundColor: colors.primary,
+      borderRadius: 8,
+      paddingVertical: 10,
+      paddingHorizontal: 28,
+    },
+    buttonText: {
+      color: colors.background,
+      fontSize: 16,
+      fontWeight: '700' as const,
+    },
+  };
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* FIXED: Apply theme colors to status bar background */}
@@ -218,6 +268,13 @@ export default function SettingsScreen() {
               title="Currency"
               subtitle={`${userSettings.currency} (${userSettings.currencySymbol})`}
               onPress={() => setShowCurrencyModal(true)}
+            />
+
+            <SettingsItem
+              icon={<Smartphone size={20} color={colors.primary} />}
+              title="Widget Settings"
+              subtitle="Configure home screen widgets"
+              onPress={() => setShowWidgetModal(true)}
             />
           </View>
 
@@ -301,6 +358,24 @@ export default function SettingsScreen() {
           onClose={() => setShowResetModal(false)}
           onConfirm={performReset}
         />
+
+        {/* Widget Coming Soon Modal */}
+        <Modal
+          visible={showWidgetModal}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowWidgetModal(false)}
+        >
+          <View style={themedModalStyles.backdrop}>
+            <View style={themedModalStyles.modalContainer}>
+              <Text style={themedModalStyles.title}>Coming Soon</Text>
+              <Text style={themedModalStyles.message}>Widget system will come in future versions.</Text>
+              <TouchableOpacity style={themedModalStyles.button} onPress={() => setShowWidgetModal(false)}>
+                <Text style={themedModalStyles.buttonText}>OK</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
       </SafeAreaView>
     </View>
   );
