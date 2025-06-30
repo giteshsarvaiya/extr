@@ -19,8 +19,7 @@ import Animated, {
   withTiming,
   useAnimatedGestureHandler,
   runOnJS,
-  Easing,
-  withSpring
+  Easing
 } from 'react-native-reanimated';
 import { PanGestureHandler, PanGestureHandlerGestureEvent } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -71,33 +70,32 @@ export default function Sidebar({ visible, onClose }: SidebarProps) {
   const translateX = useSharedValue(-SIDEBAR_WIDTH);
   const backdropOpacity = useSharedValue(0);
   
-  // IMPROVED: Smoother animations with better easing curves
+  // FIXED: Simple timing animations instead of spring
   useEffect(() => {
     if (visible) {
-      // Slide in from left with smooth spring animation
-      translateX.value = withSpring(0, {
-        damping: 20,
-        stiffness: 300,
-        mass: 0.8,
+      // Slide in from left with simple timing animation
+      translateX.value = withTiming(0, {
+        duration: 300,
+        easing: Easing.out(Easing.quad),
       });
       backdropOpacity.value = withTiming(0.6, {
-        duration: 350,
-        easing: Easing.out(Easing.cubic),
+        duration: 300,
+        easing: Easing.out(Easing.quad),
       });
     } else {
-      // IMPROVED: Much smoother slide out with optimized timing
+      // Slide out to left with simple timing animation
       translateX.value = withTiming(-SIDEBAR_WIDTH, {
-        duration: 280,
-        easing: Easing.in(Easing.cubic),
+        duration: 250,
+        easing: Easing.in(Easing.quad),
       });
       backdropOpacity.value = withTiming(0, {
-        duration: 280,
-        easing: Easing.in(Easing.cubic),
+        duration: 250,
+        easing: Easing.in(Easing.quad),
       });
     }
   }, [visible]);
 
-  // IMPROVED: Enhanced gesture handler with smoother interactions
+  // FIXED: Enhanced gesture handler with simple timing animations
   const gestureHandler = useAnimatedGestureHandler<PanGestureHandlerGestureEvent>({
     onStart: (_, context) => {
       context.startX = translateX.value;
@@ -107,7 +105,7 @@ export default function Sidebar({ visible, onClose }: SidebarProps) {
       // Only allow swiping left (closing)
       if (newTranslateX <= 0) {
         translateX.value = Math.max(newTranslateX, -SIDEBAR_WIDTH);
-        // Update backdrop opacity based on position with smoother interpolation
+        // Update backdrop opacity based on position with smooth interpolation
         const progress = Math.abs(newTranslateX) / SIDEBAR_WIDTH;
         const easedProgress = 1 - Math.pow(progress, 0.8); // Ease out curve
         backdropOpacity.value = Math.max(0, 0.6 * easedProgress);
@@ -119,25 +117,24 @@ export default function Sidebar({ visible, onClose }: SidebarProps) {
         event.velocityX < -SWIPE_VELOCITY_THRESHOLD;
       
       if (shouldClose) {
-        // IMPROVED: Smoother close animation with velocity-based timing
+        // FIXED: Simple close animation with timing
         const velocity = Math.abs(event.velocityX);
-        const duration = Math.max(180, Math.min(300, 300 - (velocity / 10)));
+        const duration = Math.max(180, Math.min(280, 280 - (velocity / 15)));
         
         translateX.value = withTiming(-SIDEBAR_WIDTH, {
           duration,
-          easing: Easing.in(Easing.cubic),
+          easing: Easing.in(Easing.quad),
         });
         backdropOpacity.value = withTiming(0, {
           duration,
-          easing: Easing.in(Easing.cubic),
+          easing: Easing.in(Easing.quad),
         });
         runOnJS(onClose)();
       } else {
-        // IMPROVED: Smoother snap back with spring animation
-        translateX.value = withSpring(0, {
-          damping: 18,
-          stiffness: 250,
-          mass: 0.7,
+        // FIXED: Simple snap back with timing animation
+        translateX.value = withTiming(0, {
+          duration: 200,
+          easing: Easing.out(Easing.quad),
         });
         backdropOpacity.value = withTiming(0.6, {
           duration: 200,
@@ -191,7 +188,7 @@ export default function Sidebar({ visible, onClose }: SidebarProps) {
     >
       <StatusBar 
         style={theme === 'dark' ? 'light' : 'dark'} 
-        backgroundColor={colors.statusBarBackground}
+        backgroundColor={colors.background}
         translucent={false}
       />
       

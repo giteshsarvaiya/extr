@@ -909,8 +909,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingVertical: 16,
-    paddingBottom: 16,
+    paddingVertical: 6,
+    paddingBottom: 10,
   },
   dateNavigationContainer: {
     flexDirection: 'row',

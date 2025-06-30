@@ -19,7 +19,6 @@ import Animated, {
   useAnimatedStyle,
   withTiming,
   Easing,
-  withSpring,
 } from 'react-native-reanimated';
 
 const { width } = Dimensions.get('window');
@@ -41,17 +40,17 @@ export default function ResetConfirmationModal({
 
   // Animation values
   const backdropOpacity = useSharedValue(0);
-  const modalScale = useSharedValue(0.85);
+  const modalScale = useSharedValue(0.9);
   const modalOpacity = useSharedValue(0);
-  const modalTranslateY = useSharedValue(50);
+  const modalTranslateY = useSharedValue(30);
 
-  // IMPROVED: Enhanced modal opening/closing animations
+  // FIXED: Smooth modal opening/closing animations
   React.useEffect(() => {
     if (visible) {
       setConfirmationText('');
       setIsProcessing(false);
       
-      // IMPROVED: Smoother opening animations with spring
+      // FIXED: Smooth opening animations with timing
       backdropOpacity.value = withTiming(1, { 
         duration: 250,
         easing: Easing.out(Easing.quad)
@@ -62,19 +61,17 @@ export default function ResetConfirmationModal({
         easing: Easing.out(Easing.quad)
       });
       
-      modalScale.value = withSpring(1, {
-        damping: 18,
-        stiffness: 300,
-        mass: 0.8,
+      modalScale.value = withTiming(1, {
+        duration: 250,
+        easing: Easing.out(Easing.quad),
       });
 
-      modalTranslateY.value = withSpring(0, {
-        damping: 18,
-        stiffness: 300,
-        mass: 0.8,
+      modalTranslateY.value = withTiming(0, {
+        duration: 250,
+        easing: Easing.out(Easing.quad),
       });
     } else {
-      // IMPROVED: Much smoother closing animations
+      // FIXED: Smooth closing animations
       backdropOpacity.value = withTiming(0, { 
         duration: 200,
         easing: Easing.in(Easing.quad)
@@ -85,12 +82,12 @@ export default function ResetConfirmationModal({
         easing: Easing.in(Easing.quad)
       });
       
-      modalScale.value = withTiming(0.85, { 
+      modalScale.value = withTiming(0.9, { 
         duration: 200,
         easing: Easing.in(Easing.quad)
       });
 
-      modalTranslateY.value = withTiming(50, { 
+      modalTranslateY.value = withTiming(30, { 
         duration: 200,
         easing: Easing.in(Easing.quad)
       });
@@ -311,7 +308,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 40,
     // FIXED: Position modal higher from center
-    marginTop: -80, // Moved higher from center
+    marginTop: -40, // Moved higher from center
   },
   modal: {
     width: Math.min(width - 40, 450),

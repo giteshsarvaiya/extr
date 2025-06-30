@@ -81,10 +81,10 @@ export default function ProScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* FIXED: Proper status bar configuration for dark mode */}
+      {/* FIXED: Apply theme colors to status bar background */}
       <StatusBar 
         style={theme === 'dark' ? 'light' : 'dark'} 
-        backgroundColor={theme === 'dark' ? colors.background : colors.statusBarBackground}
+        backgroundColor={colors.background}
         translucent={false}
       />
       <SafeAreaView style={styles.safeContainer}>

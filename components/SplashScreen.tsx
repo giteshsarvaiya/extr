@@ -111,10 +111,10 @@ export default function SplashScreen({ onAnimationComplete }: SplashScreenProps)
 
   return (
     <Animated.View style={[styles.container, { backgroundColor: colors.background }, backgroundStyle]}>
-      {/* FIXED: Proper status bar configuration for dark mode */}
+      {/* FIXED: Apply theme colors to status bar background */}
       <StatusBar 
         style={theme === 'dark' ? 'light' : 'dark'} 
-        backgroundColor={theme === 'dark' ? colors.background : colors.statusBarBackground}
+        backgroundColor={colors.background}
         translucent={false}
       />
       

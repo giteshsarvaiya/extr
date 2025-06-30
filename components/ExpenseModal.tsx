@@ -20,7 +20,6 @@ import Animated, {
   useAnimatedStyle,
   withTiming,
   Easing,
-  withSpring,
 } from 'react-native-reanimated';
 
 const { width, height } = Dimensions.get('window');
@@ -54,11 +53,11 @@ export default function ExpenseModal({
 
   // Animation values
   const backdropOpacity = useSharedValue(0);
-  const modalScale = useSharedValue(0.85);
+  const modalScale = useSharedValue(0.9);
   const modalOpacity = useSharedValue(0);
-  const modalTranslateY = useSharedValue(50);
+  const modalTranslateY = useSharedValue(30);
 
-  // IMPROVED: Enhanced modal opening/closing animations
+  // FIXED: Smoother modal opening/closing animations
   useEffect(() => {
     if (visible) {
       // Reset form data
@@ -72,7 +71,7 @@ export default function ExpenseModal({
       
       setIsAnimating(true);
       
-      // IMPROVED: Smoother opening animations with spring
+      // FIXED: Smooth opening animations with timing
       backdropOpacity.value = withTiming(1, { 
         duration: 250,
         easing: Easing.out(Easing.quad)
@@ -83,27 +82,25 @@ export default function ExpenseModal({
         easing: Easing.out(Easing.quad)
       });
       
-      modalScale.value = withSpring(1, {
-        damping: 18,
-        stiffness: 300,
-        mass: 0.8,
+      modalScale.value = withTiming(1, {
+        duration: 250,
+        easing: Easing.out(Easing.quad),
       });
 
-      modalTranslateY.value = withSpring(0, {
-        damping: 18,
-        stiffness: 300,
-        mass: 0.8,
+      modalTranslateY.value = withTiming(0, {
+        duration: 250,
+        easing: Easing.out(Easing.quad),
       });
       
       // Enable auto focus after animation
       setTimeout(() => {
         setShouldAutoFocus(true);
         setIsAnimating(false);
-      }, 300);
+      }, 280);
     } else {
       setIsAnimating(true);
       
-      // IMPROVED: Much smoother closing animations
+      // FIXED: Smooth closing animations
       backdropOpacity.value = withTiming(0, { 
         duration: 200,
         easing: Easing.in(Easing.quad)
@@ -114,12 +111,12 @@ export default function ExpenseModal({
         easing: Easing.in(Easing.quad)
       });
       
-      modalScale.value = withTiming(0.85, { 
+      modalScale.value = withTiming(0.9, { 
         duration: 200,
         easing: Easing.in(Easing.quad)
       });
 
-      modalTranslateY.value = withTiming(50, { 
+      modalTranslateY.value = withTiming(30, { 
         duration: 200,
         easing: Easing.in(Easing.quad)
       });
@@ -380,7 +377,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 40,
     // FIXED: Position modal higher from center
-    marginTop: -80, // This moves the modal up by 80px from center
+    marginTop: -40, // This moves the modal up by 40px from center
   },
   modal: {
     width: Math.min(width - 40, 400),
