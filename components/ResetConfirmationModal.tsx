@@ -37,6 +37,7 @@ export default function ResetConfirmationModal({
   const { colors, theme } = useTheme();
   const [confirmationText, setConfirmationText] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isAnimating, setIsAnimating] = useState(false);
 
   // Animation values
   const backdropOpacity = useSharedValue(0);
@@ -49,6 +50,7 @@ export default function ResetConfirmationModal({
     if (visible) {
       setConfirmationText('');
       setIsProcessing(false);
+      setIsAnimating(true);
       
       // FIXED: Smooth opening animations with timing
       backdropOpacity.value = withTiming(1, { 
@@ -70,7 +72,14 @@ export default function ResetConfirmationModal({
         duration: 250,
         easing: Easing.out(Easing.quad),
       });
+
+      // Animation complete
+      setTimeout(() => {
+        setIsAnimating(false);
+      }, 280);
     } else {
+      setIsAnimating(true);
+      
       // FIXED: Smooth closing animations
       backdropOpacity.value = withTiming(0, { 
         duration: 200,
@@ -91,6 +100,11 @@ export default function ResetConfirmationModal({
         duration: 200,
         easing: Easing.in(Easing.quad)
       });
+
+      // Animation complete
+      setTimeout(() => {
+        setIsAnimating(false);
+      }, 200);
     }
   }, [visible]);
 
@@ -108,7 +122,7 @@ export default function ResetConfirmationModal({
   };
 
   const handleBackdropPress = () => {
-    if (!isProcessing) {
+    if (!isProcessing && !isAnimating) {
       onClose();
     }
   };
@@ -127,14 +141,14 @@ export default function ResetConfirmationModal({
     ],
   }));
 
-  // FIXED: Don't render the modal at all when not visible to prevent layout shifts
-  if (!visible) {
+  // CRITICAL FIX: Don't render the modal at all when not visible to prevent layout shifts
+  if (!visible && !isAnimating) {
     return null;
   }
 
   return (
     <Modal
-      visible={visible}
+      visible={visible || isAnimating}
       transparent
       animationType="none"
       onRequestClose={onClose}
@@ -146,10 +160,11 @@ export default function ResetConfirmationModal({
     >
       <StatusBar 
         style={theme === 'dark' ? 'light' : 'dark'} 
-        backgroundColor="rgba(0,0,0,0.5)"
+        backgroundColor={colors.statusBarBackground}
+        translucent={false}
       />
       
-      {/* FIXED: Container that doesn't interfere with main content */}
+      {/* CRITICAL FIX: Container that doesn't interfere with main content */}
       <View style={styles.modalContainer}>
         <Animated.View style={[styles.backdrop, backdropStyle]}>
           <TouchableWithoutFeedback onPress={handleBackdropPress}>
@@ -290,7 +305,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     width: '100%',
     height: '100%',
-    // FIXED: Ensure modal doesn't interfere with main content
+    // CRITICAL FIX: Ensure modal doesn't interfere with main content
     zIndex: 9999,
   },
   backdrop: {
@@ -308,7 +323,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 40,
     // FIXED: Position modal higher from center
-    marginTop: -40, // Moved higher from center
+    marginTop: -20, // Moved higher from center
   },
   modal: {
     width: Math.min(width - 40, 450),

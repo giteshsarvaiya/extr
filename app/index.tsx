@@ -68,8 +68,8 @@ export default function HomeScreen() {
   const stickyHeaderScale = useRef(new Animated.Value(0.9)).current;
   const stickyHeaderTranslateY = useRef(new Animated.Value(-50)).current;
 
-  // Details content animation
-  const detailsTranslateY = useRef(new Animated.Value(screenHeight)).current;
+  // FIXED: Details content animation - now slides from bottom instead of covering entire screen
+  const detailsTranslateY = useRef(new Animated.Value(screenHeight * 0.6)).current;
   const detailsOpacity = useRef(new Animated.Value(0)).current;
 
   // Toggle button animation
@@ -105,7 +105,7 @@ export default function HomeScreen() {
     }
   }, [settingsLoading, userSettings, router]);
 
-  // FIXED: Animate details when showDetails changes - eliminate flash completely
+  // FIXED: Animate details when showDetails changes - keep navigation accessible
   useEffect(() => {
     if (showDetails) {
       // Phase 1: Hide main amount display quickly
@@ -149,9 +149,9 @@ export default function HomeScreen() {
             useNativeDriver: true,
           }),
         ]).start();
-      }, 200); // Increased delay to prevent any flash
+      }, 200);
 
-      // Phase 3: Animate details content up
+      // Phase 3: Animate details content up from bottom (partial height)
       setTimeout(() => {
         Animated.parallel([
           Animated.timing(detailsTranslateY, {
@@ -171,7 +171,7 @@ export default function HomeScreen() {
       setTimeout(() => {
         Animated.parallel([
           Animated.spring(toggleButtonTranslateY, {
-            toValue: -250,
+            toValue: -180,
             tension: 120,
             friction: 8,
             useNativeDriver: true,
@@ -187,7 +187,6 @@ export default function HomeScreen() {
 
     } else {
       // FIXED: Immediately hide sticky header without any flash
-      // Set values instantly to prevent any visual appearance
       stickyHeaderOpacity.setValue(0);
       stickyHeaderScale.setValue(0.9);
       stickyHeaderTranslateY.setValue(-50);
@@ -208,10 +207,10 @@ export default function HomeScreen() {
         }),
       ]).start();
 
-      // Phase 2: Hide details content
+      // Phase 2: Hide details content (slide down to partial height)
       Animated.parallel([
         Animated.timing(detailsTranslateY, {
-          toValue: screenHeight,
+          toValue: screenHeight * 0.6,
           duration: 400,
           useNativeDriver: true,
         }),
@@ -588,100 +587,103 @@ export default function HomeScreen() {
               />
             </View>
 
-            {/* Date Selector with Navigation */}
-            <View style={styles.dateNavigationContainer}>
-              <TouchableOpacity 
-                style={styles.navButton}
-                onPress={() => navigatePeriod('prev')}
-                activeOpacity={0.7}
-              >
-                <ChevronLeft size={20} color={colors.text} />
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={styles.dateSelector}
-                onPress={handleDatePickerPress}
-                activeOpacity={0.7}
-              >
-                <Calendar size={20} color={colors.text} />
-                <Text style={[styles.dateText, { color: colors.text }]}>{getPeriodLabel()}</Text>
-                <ChevronDown size={20} color={colors.text} />
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={[
-                  styles.navButton,
-                  isNextDisabled() && styles.navButtonDisabled
-                ]}
-                onPress={() => navigatePeriod('next')}
-                activeOpacity={isNextDisabled() ? 1 : 0.7}
-                disabled={isNextDisabled()}
-              >
-                <ChevronRight 
-                  size={20} 
-                  color={isNextDisabled() ? colors.textSecondary + '50' : colors.text} 
-                />
-              </TouchableOpacity>
-            </View>
+            {/* FIXED: Navigation section that stays accessible */}
+            <View style={styles.navigationSection}>
+              {/* Date Selector with Navigation */}
+              <View style={styles.dateNavigationContainer}>
+                <TouchableOpacity 
+                  style={styles.navButton}
+                  onPress={() => navigatePeriod('prev')}
+                  activeOpacity={0.7}
+                >
+                  <ChevronLeft size={20} color={colors.text} />
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={styles.dateSelector}
+                  onPress={handleDatePickerPress}
+                  activeOpacity={0.7}
+                >
+                  <Calendar size={20} color={colors.text} />
+                  <Text style={[styles.dateText, { color: colors.text }]}>{getPeriodLabel()}</Text>
+                  <ChevronDown size={20} color={colors.text} />
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={[
+                    styles.navButton,
+                    isNextDisabled() && styles.navButtonDisabled
+                  ]}
+                  onPress={() => navigatePeriod('next')}
+                  activeOpacity={isNextDisabled() ? 1 : 0.7}
+                  disabled={isNextDisabled()}
+                >
+                  <ChevronRight 
+                    size={20} 
+                    color={isNextDisabled() ? colors.textSecondary + '50' : colors.text} 
+                  />
+                </TouchableOpacity>
+              </View>
 
-            {/* NEW: Divider between date header and tabs */}
-            <View style={[styles.divider, { backgroundColor: colors.border }]} />
+              {/* Divider between date header and tabs */}
+              <View style={[styles.divider, { backgroundColor: colors.border }]} />
 
-            {/* Tabs - Weekly, Daily, Monthly */}
-            <View style={styles.tabsContainer}>
-              <TouchableOpacity
-                style={[
-                  styles.tab,
-                  viewMode === 'weekly' && { borderBottomColor: colors.primary, borderBottomWidth: 2 }
-                ]}
-                onPress={() => setViewMode('weekly')}
-                activeOpacity={0.7}
-              >
-                <Text
+              {/* Tabs - Weekly, Daily, Monthly */}
+              <View style={styles.tabsContainer}>
+                <TouchableOpacity
                   style={[
-                    styles.tabText,
-                    { color: viewMode === 'weekly' ? colors.primary : colors.textSecondary }
+                    styles.tab,
+                    viewMode === 'weekly' && { borderBottomColor: colors.primary, borderBottomWidth: 2 }
                   ]}
+                  onPress={() => setViewMode('weekly')}
+                  activeOpacity={0.7}
                 >
-                  Weekly
-                </Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity
-                style={[
-                  styles.tab,
-                  viewMode === 'daily' && { borderBottomColor: colors.primary, borderBottomWidth: 2 }
-                ]}
-                onPress={() => setViewMode('daily')}
-                activeOpacity={0.7}
-              >
-                <Text
+                  <Text
+                    style={[
+                      styles.tabText,
+                      { color: viewMode === 'weekly' ? colors.primary : colors.textSecondary }
+                    ]}
+                  >
+                    Weekly
+                  </Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity
                   style={[
-                    styles.tabText,
-                    { color: viewMode === 'daily' ? colors.primary : colors.textSecondary }
+                    styles.tab,
+                    viewMode === 'daily' && { borderBottomColor: colors.primary, borderBottomWidth: 2 }
                   ]}
+                  onPress={() => setViewMode('daily')}
+                  activeOpacity={0.7}
                 >
-                  Daily
-                </Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity
-                style={[
-                  styles.tab,
-                  viewMode === 'monthly' && { borderBottomColor: colors.primary, borderBottomWidth: 2 }
-                ]}
-                onPress={() => setViewMode('monthly')}
-                activeOpacity={0.7}
-              >
-                <Text
+                  <Text
+                    style={[
+                      styles.tabText,
+                      { color: viewMode === 'daily' ? colors.primary : colors.textSecondary }
+                    ]}
+                  >
+                    Daily
+                  </Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity
                   style={[
-                    styles.tabText,
-                    { color: viewMode === 'monthly' ? colors.primary : colors.textSecondary }
+                    styles.tab,
+                    viewMode === 'monthly' && { borderBottomColor: colors.primary, borderBottomWidth: 2 }
                   ]}
+                  onPress={() => setViewMode('monthly')}
+                  activeOpacity={0.7}
                 >
-                  Monthly
-                </Text>
-              </TouchableOpacity>
+                  <Text
+                    style={[
+                      styles.tabText,
+                      { color: viewMode === 'monthly' ? colors.primary : colors.textSecondary }
+                    ]}
+                  >
+                    Monthly
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
 
             {/* FIXED: Sticky Header - completely hidden when not in use and no flash */}
@@ -762,7 +764,7 @@ export default function HomeScreen() {
                 </TouchableOpacity>
               </Animated.View>
 
-              {/* Animated Details Content */}
+              {/* FIXED: Details Content - now positioned to not cover navigation */}
               <Animated.View
                 style={[
                   styles.detailsContainer,
@@ -783,7 +785,7 @@ export default function HomeScreen() {
                   showsVerticalScrollIndicator={false}
                   contentContainerStyle={{
                     paddingBottom: 40 + insets.bottom,
-                    paddingTop: 80, // Extra padding to account for the toggle button
+                    paddingTop: 20, // Reduced padding since navigation is now accessible
                   }}
                 >
                   {/* Expense List with Date Headers */}
@@ -841,7 +843,7 @@ export default function HomeScreen() {
                   { 
                     backgroundColor: colors.primary, 
                     shadowColor: colors.shadowColor,
-                    bottom: 50 + insets.bottom, // FIXED: Moved higher from bottom
+                    bottom: 50 + insets.bottom,
                   }
                 ]}
                 onPress={handleAddExpense}
@@ -912,6 +914,11 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     paddingBottom: 10,
   },
+  // FIXED: Navigation section that stays accessible
+  navigationSection: {
+    backgroundColor: 'transparent',
+    zIndex: 10, // Ensure it stays above details content
+  },
   dateNavigationContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -946,7 +953,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: 'Inter-Medium',
   },
-  // NEW: Divider styles
+  // Divider styles
   divider: {
     height: 1,
     marginHorizontal: 20,
@@ -1037,12 +1044,14 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Medium',
     letterSpacing: 0.2,
   },
+  // FIXED: Details container positioned to not cover navigation
   detailsContainer: {
     position: 'absolute',
-    top: 0,
+    top: 120, // Start below the navigation section
     left: 0,
     right: 0,
     bottom: 0,
+    backgroundColor: 'transparent',
   },
   detailsScrollView: {
     flex: 1,

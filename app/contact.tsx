@@ -52,7 +52,7 @@ export default function ContactScreen() {
       {/* FIXED: Apply theme colors to status bar background */}
       <StatusBar 
         style={theme === 'dark' ? 'light' : 'dark'} 
-        backgroundColor={colors.background}
+        backgroundColor={colors.statusBarBackground}
         translucent={false}
       />
       <SafeAreaView style={styles.safeContainer}>

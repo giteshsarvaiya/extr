@@ -8,10 +8,10 @@ import {
   TextInput,
   SectionList,
   SafeAreaView,
-  StatusBar,
   Platform,
   ActivityIndicator,
 } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Search, X, RotateCcw, Check, DollarSign, TrendingUp } from 'lucide-react-native';
 
@@ -239,7 +239,7 @@ export default function CurrencySelector({
   selectedValue, 
   onSelect 
 }: CurrencySelectorProps) {
-  const { colors } = useTheme();
+  const { colors, theme } = useTheme();
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   
@@ -379,7 +379,11 @@ export default function CurrencySelector({
       onRequestClose={onClose}
       statusBarTranslucent={Platform.OS === 'android'}
     >
-      <StatusBar backgroundColor="rgba(0,0,0,0.5)" barStyle="light-content" />
+      <StatusBar 
+        style={theme === 'dark' ? 'light' : 'dark'} 
+        backgroundColor={colors.statusBarBackground}
+        translucent={false}
+      />
       <View style={styles.modalOverlay}>
         <SafeAreaView style={[styles.modalContainer, { backgroundColor: colors.surface }]}>
           {/* Header */}
