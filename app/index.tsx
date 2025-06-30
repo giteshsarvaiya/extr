@@ -15,7 +15,7 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { useExpense } from '@/contexts/ExpenseContext';
 import { useSettings } from '@/contexts/SettingsContext';
 import { ChevronDown, ChevronUp, Edit, Trash2, Calendar, Plus, ChevronLeft, ChevronRight } from 'lucide-react-native';
-import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isToday, addDays, subDays, addWeeks, subWeeks, addMonths, subMonths, isSameDay, setHours, setMinutes, setSeconds, setMilliseconds, isAfter, isBefore, isSameWeek, isSameMonth } from 'date-fns';
+import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isToday, addDays, subDays, addWeeks, subWeeks, addMonths, subMonths, isSameDay, setHours, setMinutes, setSeconds, setMilliseconds, isAfter, isBefore, isSameWeek, isSameMonth, isWithinInterval } from 'date-fns';
 import Sidebar from '@/components/Sidebar';
 import HeaderBrand from '@/components/HeaderBrand';
 import ExpenseModal from '@/components/ExpenseModal';
@@ -76,8 +76,44 @@ export default function HomeScreen() {
 
   // Toggle button animation
   const toggleButtonTranslateY = useRef(new Animated.Value(0)).current;
-  const toggleButtonOpacity = useRef(new Animated.Value(1)).current;
   const toggleButtonScale = useRef(new Animated.Value(1)).current;
+  const toggleButtonOpacity = useRef(new Animated.Value(1)).current;
+
+  // FIXED: Calculate dynamic toggle button position based on content
+  const getToggleButtonPosition = () => {
+    // Base position calculation
+    const basePosition = -200; // Reduced from -220 for better positioning
+    const today = new Date();
+    
+    // Adjust based on view mode and content
+    switch (viewMode) {
+      case 'daily':
+        // For daily view, check if it's today or other dates
+        if (isToday(selectedDate)) {
+          return basePosition; // Today has more content
+        } else {
+          return basePosition + 20; // Other dates might have less content
+        }
+      case 'weekly':
+        // For weekly view, check if it's current week
+        const { start: weekStart, end: weekEnd } = getPeriodRange();
+        if (isWithinInterval(today, { start: weekStart, end: weekEnd })) {
+          return basePosition; // Current week has more content
+        } else {
+          return basePosition + 30; // Other weeks might have less content
+        }
+      case 'monthly':
+        // For monthly view, check if it's current month
+        const { start: monthStart, end: monthEnd } = getPeriodRange();
+        if (isWithinInterval(today, { start: monthStart, end: monthEnd })) {
+          return basePosition; // Current month has more content
+        } else {
+          return basePosition + 40; // Other months might have less content
+        }
+      default:
+        return basePosition;
+    }
+  };
 
   // IMPROVED: Enhanced setup check with better debugging
   useEffect(() => {
@@ -169,11 +205,11 @@ export default function HomeScreen() {
         ]).start();
       }, 150);
 
-      // Phase 4: Animate toggle button to fixed position
+      // Phase 4: Animate toggle button to dynamic position
       setTimeout(() => {
         Animated.parallel([
           Animated.spring(toggleButtonTranslateY, {
-            toValue: -220,
+            toValue: getToggleButtonPosition(),
             tension: 120,
             friction: 8,
             useNativeDriver: true,
@@ -245,7 +281,20 @@ export default function HomeScreen() {
         ]).start();
       }, 100);
     }
-  }, [showDetails]);
+  }, [showDetails]); // FIXED: Removed viewMode and selectedDate dependencies to prevent unnecessary animations
+
+  // FIXED: Separate effect to handle position updates only when details are shown
+  useEffect(() => {
+    if (showDetails) {
+      // Only animate the button position if details are currently shown
+      Animated.spring(toggleButtonTranslateY, {
+        toValue: getToggleButtonPosition(),
+        tension: 120,
+        friction: 8,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [viewMode, selectedDate, showDetails]); // Only recalculate when details are shown
 
   // IMPROVED: Enhanced currency formatting with English suffixes
   const formatCurrency = (amount: number): string => {
