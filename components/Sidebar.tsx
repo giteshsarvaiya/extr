@@ -19,7 +19,8 @@ import Animated, {
   withTiming,
   useAnimatedGestureHandler,
   runOnJS,
-  Easing
+  Easing,
+  withSpring
 } from 'react-native-reanimated';
 import { PanGestureHandler, PanGestureHandlerGestureEvent } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -70,32 +71,33 @@ export default function Sidebar({ visible, onClose }: SidebarProps) {
   const translateX = useSharedValue(-SIDEBAR_WIDTH);
   const backdropOpacity = useSharedValue(0);
   
-  // X-style slide animations
+  // IMPROVED: Smoother animations with better easing curves
   useEffect(() => {
     if (visible) {
-      // Slide in from left
-      translateX.value = withTiming(0, {
-        duration: 300,
-        easing: Easing.out(Easing.cubic),
+      // Slide in from left with smooth spring animation
+      translateX.value = withSpring(0, {
+        damping: 20,
+        stiffness: 300,
+        mass: 0.8,
       });
       backdropOpacity.value = withTiming(0.6, {
-        duration: 300,
+        duration: 350,
         easing: Easing.out(Easing.cubic),
       });
     } else {
-      // Slide out to left
+      // IMPROVED: Much smoother slide out with optimized timing
       translateX.value = withTiming(-SIDEBAR_WIDTH, {
-        duration: 300,
+        duration: 280,
         easing: Easing.in(Easing.cubic),
       });
       backdropOpacity.value = withTiming(0, {
-        duration: 300,
+        duration: 280,
         easing: Easing.in(Easing.cubic),
       });
     }
   }, [visible]);
 
-  // Gesture handler for swipe to close
+  // IMPROVED: Enhanced gesture handler with smoother interactions
   const gestureHandler = useAnimatedGestureHandler<PanGestureHandlerGestureEvent>({
     onStart: (_, context) => {
       context.startX = translateX.value;
@@ -105,9 +107,10 @@ export default function Sidebar({ visible, onClose }: SidebarProps) {
       // Only allow swiping left (closing)
       if (newTranslateX <= 0) {
         translateX.value = Math.max(newTranslateX, -SIDEBAR_WIDTH);
-        // Update backdrop opacity based on position
+        // Update backdrop opacity based on position with smoother interpolation
         const progress = Math.abs(newTranslateX) / SIDEBAR_WIDTH;
-        backdropOpacity.value = Math.max(0, 0.6 * (1 - progress));
+        const easedProgress = 1 - Math.pow(progress, 0.8); // Ease out curve
+        backdropOpacity.value = Math.max(0, 0.6 * easedProgress);
       }
     },
     onEnd: (event) => {
@@ -116,25 +119,29 @@ export default function Sidebar({ visible, onClose }: SidebarProps) {
         event.velocityX < -SWIPE_VELOCITY_THRESHOLD;
       
       if (shouldClose) {
-        // Close the sidebar
+        // IMPROVED: Smoother close animation with velocity-based timing
+        const velocity = Math.abs(event.velocityX);
+        const duration = Math.max(180, Math.min(300, 300 - (velocity / 10)));
+        
         translateX.value = withTiming(-SIDEBAR_WIDTH, {
-          duration: 200,
+          duration,
           easing: Easing.in(Easing.cubic),
         });
         backdropOpacity.value = withTiming(0, {
-          duration: 200,
+          duration,
           easing: Easing.in(Easing.cubic),
         });
         runOnJS(onClose)();
       } else {
-        // Snap back to open position
-        translateX.value = withTiming(0, {
-          duration: 200,
-          easing: Easing.out(Easing.cubic),
+        // IMPROVED: Smoother snap back with spring animation
+        translateX.value = withSpring(0, {
+          damping: 18,
+          stiffness: 250,
+          mass: 0.7,
         });
         backdropOpacity.value = withTiming(0.6, {
           duration: 200,
-          easing: Easing.out(Easing.cubic),
+          easing: Easing.out(Easing.quad),
         });
       }
     },
@@ -276,7 +283,7 @@ export default function Sidebar({ visible, onClose }: SidebarProps) {
                     Version 1.0.0
                   </Text>
                   <Text style={[styles.footerSubtext, { color: colors.textSecondary }]}>
-                    Made with Bolt.new⚡
+                    Made with ❤️ using Bolt.new⚡
                   </Text>
                 </View>
               </View>

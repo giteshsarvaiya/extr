@@ -19,6 +19,7 @@ import Animated, {
   useAnimatedStyle,
   withTiming,
   Easing,
+  withSpring,
 } from 'react-native-reanimated';
 
 const { width } = Dimensions.get('window');
@@ -40,44 +41,57 @@ export default function ResetConfirmationModal({
 
   // Animation values
   const backdropOpacity = useSharedValue(0);
-  const modalScale = useSharedValue(0.9);
+  const modalScale = useSharedValue(0.85);
   const modalOpacity = useSharedValue(0);
+  const modalTranslateY = useSharedValue(50);
 
-  // Handle modal opening/closing
+  // IMPROVED: Enhanced modal opening/closing animations
   React.useEffect(() => {
     if (visible) {
       setConfirmationText('');
       setIsProcessing(false);
       
-      // Start animations
+      // IMPROVED: Smoother opening animations with spring
       backdropOpacity.value = withTiming(1, { 
-        duration: 200,
-        easing: Easing.ease
+        duration: 250,
+        easing: Easing.out(Easing.quad)
       });
       
       modalOpacity.value = withTiming(1, { 
-        duration: 200,
-        easing: Easing.ease
-      });
-      
-      modalScale.value = withTiming(1, { 
-        duration: 200,
+        duration: 250,
         easing: Easing.out(Easing.quad)
       });
+      
+      modalScale.value = withSpring(1, {
+        damping: 18,
+        stiffness: 300,
+        mass: 0.8,
+      });
+
+      modalTranslateY.value = withSpring(0, {
+        damping: 18,
+        stiffness: 300,
+        mass: 0.8,
+      });
     } else {
-      // Close animations
+      // IMPROVED: Much smoother closing animations
       backdropOpacity.value = withTiming(0, { 
-        duration: 150,
-        easing: Easing.ease
+        duration: 200,
+        easing: Easing.in(Easing.quad)
       });
       
       modalOpacity.value = withTiming(0, { 
-        duration: 150,
-        easing: Easing.ease
+        duration: 200,
+        easing: Easing.in(Easing.quad)
       });
       
-      modalScale.value = withTiming(0.9, { 
-        duration: 150,
+      modalScale.value = withTiming(0.85, { 
+        duration: 200,
+        easing: Easing.in(Easing.quad)
+      });
+
+      modalTranslateY.value = withTiming(50, { 
+        duration: 200,
         easing: Easing.in(Easing.quad)
       });
     }
@@ -110,7 +124,10 @@ export default function ResetConfirmationModal({
 
   const modalStyle = useAnimatedStyle(() => ({
     opacity: modalOpacity.value,
-    transform: [{ scale: modalScale.value }],
+    transform: [
+      { scale: modalScale.value },
+      { translateY: modalTranslateY.value }
+    ],
   }));
 
   // FIXED: Don't render the modal at all when not visible to prevent layout shifts
@@ -294,7 +311,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 40,
     // FIXED: Position modal higher from center
-    marginTop: -120, // Moved higher from center
+    marginTop: -80, // Moved higher from center
   },
   modal: {
     width: Math.min(width - 40, 450),

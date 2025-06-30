@@ -20,6 +20,7 @@ import Animated, {
   useAnimatedStyle,
   withTiming,
   Easing,
+  withSpring,
 } from 'react-native-reanimated';
 
 const { width, height } = Dimensions.get('window');
@@ -53,10 +54,11 @@ export default function ExpenseModal({
 
   // Animation values
   const backdropOpacity = useSharedValue(0);
-  const modalScale = useSharedValue(0.9);
+  const modalScale = useSharedValue(0.85);
   const modalOpacity = useSharedValue(0);
+  const modalTranslateY = useSharedValue(50);
 
-  // Handle modal opening/closing
+  // IMPROVED: Enhanced modal opening/closing animations
   useEffect(() => {
     if (visible) {
       // Reset form data
@@ -70,43 +72,55 @@ export default function ExpenseModal({
       
       setIsAnimating(true);
       
-      // Start animations
+      // IMPROVED: Smoother opening animations with spring
       backdropOpacity.value = withTiming(1, { 
-        duration: 200,
-        easing: Easing.ease
+        duration: 250,
+        easing: Easing.out(Easing.quad)
       });
       
       modalOpacity.value = withTiming(1, { 
-        duration: 200,
-        easing: Easing.ease
+        duration: 250,
+        easing: Easing.out(Easing.quad)
       });
       
-      modalScale.value = withTiming(1, { 
-        duration: 200,
-        easing: Easing.out(Easing.quad)
+      modalScale.value = withSpring(1, {
+        damping: 18,
+        stiffness: 300,
+        mass: 0.8,
+      });
+
+      modalTranslateY.value = withSpring(0, {
+        damping: 18,
+        stiffness: 300,
+        mass: 0.8,
       });
       
       // Enable auto focus after animation
       setTimeout(() => {
         setShouldAutoFocus(true);
         setIsAnimating(false);
-      }, 250);
+      }, 300);
     } else {
       setIsAnimating(true);
       
-      // Close animations
+      // IMPROVED: Much smoother closing animations
       backdropOpacity.value = withTiming(0, { 
-        duration: 150,
-        easing: Easing.ease
+        duration: 200,
+        easing: Easing.in(Easing.quad)
       });
       
       modalOpacity.value = withTiming(0, { 
-        duration: 150,
-        easing: Easing.ease
+        duration: 200,
+        easing: Easing.in(Easing.quad)
       });
       
-      modalScale.value = withTiming(0.9, { 
-        duration: 150,
+      modalScale.value = withTiming(0.85, { 
+        duration: 200,
+        easing: Easing.in(Easing.quad)
+      });
+
+      modalTranslateY.value = withTiming(50, { 
+        duration: 200,
         easing: Easing.in(Easing.quad)
       });
       
@@ -115,7 +129,7 @@ export default function ExpenseModal({
         setShouldAutoFocus(false);
         setIsSubmitting(false);
         setIsAnimating(false);
-      }, 150);
+      }, 200);
     }
   }, [visible, editingExpense]);
 
@@ -173,10 +187,13 @@ export default function ExpenseModal({
 
   const modalStyle = useAnimatedStyle(() => ({
     opacity: modalOpacity.value,
-    transform: [{ scale: modalScale.value }],
+    transform: [
+      { scale: modalScale.value },
+      { translateY: modalTranslateY.value }
+    ],
   }));
 
-  // Don't render anything if not visible and not animating
+  // FIXED: Don't render anything if not visible and not animating to prevent layout shifts
   if (!visible && !isAnimating) {
     return null;
   }
@@ -188,147 +205,166 @@ export default function ExpenseModal({
       animationType="none"
       onRequestClose={onClose}
       statusBarTranslucent={Platform.OS === 'android'}
+      // CRITICAL FIX: Use overFullScreen to prevent layout interference
+      presentationStyle="overFullScreen"
+      // CRITICAL FIX: Prevent modal from affecting layout
+      supportedOrientations={['portrait']}
     >
       <StatusBar 
         style={theme === 'dark' ? 'light' : 'dark'} 
         backgroundColor="rgba(0,0,0,0.5)"
       />
       
-      <Animated.View style={[styles.backdrop, backdropStyle]}>
-        <TouchableWithoutFeedback onPress={handleBackdropPress}>
-          <View style={styles.backdropTouchable} />
-        </TouchableWithoutFeedback>
+      {/* FIXED: Container that doesn't interfere with main content */}
+      <View style={styles.modalContainer}>
+        <Animated.View style={[styles.backdrop, backdropStyle]}>
+          <TouchableWithoutFeedback onPress={handleBackdropPress}>
+            <View style={styles.backdropTouchable} />
+          </TouchableWithoutFeedback>
 
-        <KeyboardAvoidingView 
-          style={styles.container}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
-        >
-          <Animated.View 
-            style={[
-              styles.modal,
-              { 
-                backgroundColor: colors.surface,
-                shadowColor: colors.shadowColor,
-              },
-              modalStyle
-            ]}
+          <KeyboardAvoidingView 
+            style={styles.container}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
           >
-            {/* Header */}
-            <View style={[styles.header, { borderBottomColor: colors.border }]}>
-              <Text style={[styles.title, { color: colors.text }]}>
-                {editingExpense ? 'Edit Expense' : 'Add Expense'}
-              </Text>
-              <TouchableOpacity 
-                onPress={onClose}
-                style={styles.closeButton}
-                disabled={isSubmitting}
-              >
-                <X size={24} color={colors.textSecondary} />
-              </TouchableOpacity>
-            </View>
-
-            {/* Form */}
-            <View style={styles.form}>
-              {/* Amount Input */}
-              <View style={styles.inputGroup}>
-                <Text style={[styles.label, { color: colors.textSecondary }]}>
-                  Amount
+            <Animated.View 
+              style={[
+                styles.modal,
+                { 
+                  backgroundColor: colors.surface,
+                  shadowColor: colors.shadowColor,
+                },
+                modalStyle
+              ]}
+            >
+              {/* Header */}
+              <View style={[styles.header, { borderBottomColor: colors.border }]}>
+                <Text style={[styles.title, { color: colors.text }]}>
+                  {editingExpense ? 'Edit Expense' : 'Add Expense'}
                 </Text>
-                <TextInput
-                  ref={amountInputRef}
-                  style={[
-                    styles.input,
-                    {
-                      borderColor: colors.border,
-                      backgroundColor: colors.inputBackground,
-                      color: colors.text,
-                    }
-                  ]}
-                  placeholder="0.00"
-                  placeholderTextColor={colors.textSecondary}
-                  value={amount}
-                  onChangeText={setAmount}
-                  keyboardType="numeric"
-                  returnKeyType="next"
-                  onSubmitEditing={handleAmountSubmit}
-                  blurOnSubmit={false}
-                  editable={!isSubmitting}
-                />
+                <TouchableOpacity 
+                  onPress={onClose}
+                  style={styles.closeButton}
+                  disabled={isSubmitting}
+                >
+                  <X size={24} color={colors.textSecondary} />
+                </TouchableOpacity>
               </View>
 
-              {/* Description Input */}
-              <View style={styles.inputGroup}>
-                <Text style={[styles.label, { color: colors.textSecondary }]}>
-                  Description
-                </Text>
-                <TextInput
-                  ref={descriptionInputRef}
-                  style={[
-                    styles.input,
-                    styles.descriptionInput,
-                    {
-                      borderColor: colors.border,
-                      backgroundColor: colors.inputBackground,
-                      color: colors.text,
-                    }
-                  ]}
-                  placeholder="What did you spend on?"
-                  placeholderTextColor={colors.textSecondary}
-                  value={description}
-                  onChangeText={setDescription}
-                  returnKeyType="done"
-                  onSubmitEditing={handleDescriptionSubmit}
-                  multiline
-                  textAlignVertical="top"
-                  editable={!isSubmitting}
-                />
+              {/* Form */}
+              <View style={styles.form}>
+                {/* Amount Input */}
+                <View style={styles.inputGroup}>
+                  <Text style={[styles.label, { color: colors.textSecondary }]}>
+                    Amount
+                  </Text>
+                  <TextInput
+                    ref={amountInputRef}
+                    style={[
+                      styles.input,
+                      {
+                        borderColor: colors.border,
+                        backgroundColor: colors.inputBackground,
+                        color: colors.text,
+                      }
+                    ]}
+                    placeholder="0.00"
+                    placeholderTextColor={colors.textSecondary}
+                    value={amount}
+                    onChangeText={setAmount}
+                    keyboardType="numeric"
+                    returnKeyType="next"
+                    onSubmitEditing={handleAmountSubmit}
+                    blurOnSubmit={false}
+                    editable={!isSubmitting}
+                  />
+                </View>
+
+                {/* Description Input */}
+                <View style={styles.inputGroup}>
+                  <Text style={[styles.label, { color: colors.textSecondary }]}>
+                    Description
+                  </Text>
+                  <TextInput
+                    ref={descriptionInputRef}
+                    style={[
+                      styles.input,
+                      styles.descriptionInput,
+                      {
+                        borderColor: colors.border,
+                        backgroundColor: colors.inputBackground,
+                        color: colors.text,
+                      }
+                    ]}
+                    placeholder="What did you spend on?"
+                    placeholderTextColor={colors.textSecondary}
+                    value={description}
+                    onChangeText={setDescription}
+                    returnKeyType="done"
+                    onSubmitEditing={handleDescriptionSubmit}
+                    multiline
+                    textAlignVertical="top"
+                    editable={!isSubmitting}
+                  />
+                </View>
               </View>
-            </View>
 
-            {/* Actions */}
-            <View style={styles.actions}>
-              <TouchableOpacity
-                style={[
-                  styles.button,
-                  styles.cancelButton,
-                  { borderColor: colors.border }
-                ]}
-                onPress={onClose}
-                disabled={isSubmitting}
-              >
-                <Text style={[styles.cancelButtonText, { color: colors.textSecondary }]}>
-                  Cancel
-                </Text>
-              </TouchableOpacity>
+              {/* Actions */}
+              <View style={styles.actions}>
+                <TouchableOpacity
+                  style={[
+                    styles.button,
+                    styles.cancelButton,
+                    { borderColor: colors.border }
+                  ]}
+                  onPress={onClose}
+                  disabled={isSubmitting}
+                >
+                  <Text style={[styles.cancelButtonText, { color: colors.textSecondary }]}>
+                    Cancel
+                  </Text>
+                </TouchableOpacity>
 
-              <TouchableOpacity
-                style={[
-                  styles.button,
-                  styles.submitButton,
-                  { backgroundColor: colors.primary }
-                ]}
-                onPress={handleSubmit}
-                disabled={isSubmitting}
-              >
-                {editingExpense ? (
-                  <Check size={20} color={colors.background} />
-                ) : (
-                  <Plus size={20} color={colors.background} />
-                )}
-                <Text style={[styles.submitButtonText, { color: colors.background }]}>
-                  {isSubmitting ? 'Saving...' : editingExpense ? 'Update' : 'Add'}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </Animated.View>
-        </KeyboardAvoidingView>
-      </Animated.View>
+                <TouchableOpacity
+                  style={[
+                    styles.button,
+                    styles.submitButton,
+                    { backgroundColor: colors.primary }
+                  ]}
+                  onPress={handleSubmit}
+                  disabled={isSubmitting}
+                >
+                  {editingExpense ? (
+                    <Check size={20} color={colors.background} />
+                  ) : (
+                    <Plus size={20} color={colors.background} />
+                  )}
+                  <Text style={[styles.submitButtonText, { color: colors.background }]}>
+                    {isSubmitting ? 'Saving...' : editingExpense ? 'Update' : 'Add'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </Animated.View>
+          </KeyboardAvoidingView>
+        </Animated.View>
+      </View>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
+  // CRITICAL FIX: Modal container that doesn't affect layout
+  modalContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
+    // FIXED: Ensure modal doesn't interfere with main content
+    zIndex: 9999,
+  },
   backdrop: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
@@ -344,7 +380,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 40,
     // FIXED: Position modal higher from center
-    marginTop: -140, // This moves the modal up by 80px from center
+    marginTop: -80, // This moves the modal up by 80px from center
   },
   modal: {
     width: Math.min(width - 40, 400),

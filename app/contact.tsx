@@ -49,10 +49,10 @@ export default function ContactScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Properly themed status bar */}
+      {/* FIXED: Proper status bar configuration for dark mode */}
       <StatusBar 
-        style={theme === 'dark' ? 'dark' : 'light'} 
-        backgroundColor={colors.statusBarBackground}
+        style={theme === 'dark' ? 'light' : 'dark'} 
+        backgroundColor={theme === 'dark' ? colors.background : colors.statusBarBackground}
         translucent={false}
       />
       <SafeAreaView style={styles.safeContainer}>

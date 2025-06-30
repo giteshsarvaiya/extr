@@ -81,10 +81,10 @@ export default function ProScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Properly themed status bar */}
+      {/* FIXED: Proper status bar configuration for dark mode */}
       <StatusBar 
-        style={theme === 'dark' ? 'dark' : 'light'} 
-        backgroundColor={colors.statusBarBackground}
+        style={theme === 'dark' ? 'light' : 'dark'} 
+        backgroundColor={theme === 'dark' ? colors.background : colors.statusBarBackground}
         translucent={false}
       />
       <SafeAreaView style={styles.safeContainer}>
@@ -152,10 +152,10 @@ export default function ProScreen() {
                 ))}
               </View>
               <Text style={[styles.testimonialText, { color: colors.textSecondary }]}>
-                "ExTr PRO has completely transformed how I manage my expenses. The cloud sync is a game-changer!"
+                "I am eagerly waiting for the ExTr Pro to be launched."
               </Text>
               <Text style={[styles.testimonialAuthor, { color: colors.text }]}>
-                - Sarah M., PRO User
+                - Nilima S., pre-subscribed PRO user
               </Text>
             </View>
           </View>

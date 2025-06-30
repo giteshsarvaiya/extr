@@ -31,10 +31,10 @@ function AppContent() {
         <Stack.Screen name="contact" />
         <Stack.Screen name="+not-found" />
       </Stack>
-      {/* Global Status Bar - Properly themed */}
+      {/* FIXED: Proper status bar configuration for dark mode */}
       <StatusBar 
-        style={theme === 'dark' ? 'dark' : 'light'} 
-        backgroundColor={colors.statusBarBackground}
+        style={theme === 'dark' ? 'light' : 'dark'} 
+        backgroundColor={theme === 'dark' ? colors.background : colors.statusBarBackground}
         translucent={false}
       />
     </>

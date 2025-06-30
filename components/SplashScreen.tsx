@@ -111,10 +111,10 @@ export default function SplashScreen({ onAnimationComplete }: SplashScreenProps)
 
   return (
     <Animated.View style={[styles.container, { backgroundColor: colors.background }, backgroundStyle]}>
-      {/* Properly themed status bar */}
+      {/* FIXED: Proper status bar configuration for dark mode */}
       <StatusBar 
         style={theme === 'dark' ? 'light' : 'dark'} 
-        backgroundColor={colors.statusBarBackground}
+        backgroundColor={theme === 'dark' ? colors.background : colors.statusBarBackground}
         translucent={false}
       />
       
@@ -168,7 +168,7 @@ export default function SplashScreen({ onAnimationComplete }: SplashScreenProps)
       {/* Bottom branding */}
       <View style={styles.bottomBranding}>
         <Text style={[styles.brandingText, { color: colors.textSecondary + '80' }]}>
-          Made with Bolt.new⚡ 
+         Made with ❤️ using Bolt.new⚡ 
         </Text>
       </View>
     </Animated.View>
